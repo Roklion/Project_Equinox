@@ -17,7 +17,9 @@
 
 # Never apply line-ending conversion to binary artifacts.
 *.db binary
-*.db-* binary
+*.db-wal binary
+*.db-shm binary
+*.db-journal binary
 *.zip binary
 *.png binary
 *.jpg binary
