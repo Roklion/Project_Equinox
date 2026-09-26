@@ -8,6 +8,13 @@
 *.txt text eol=lf
 *.toml text eol=lf
 *.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.svg text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.csv text eol=lf
