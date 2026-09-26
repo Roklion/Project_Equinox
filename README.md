@@ -2,7 +2,7 @@
 
 Project Equinox is a personal investment and wealth tracker designed for desktop and iPhone. It gives a household a clear view of investment values, cash flows, performance, and composition without requiring security or tax-lot accounting.
 
-The application foundation uses Next.js App Router, React, and TypeScript in one responsive web codebase. Apache ECharts, PostgreSQL, and progressive web app capabilities are planned for later work. Python and FastAPI may be introduced later for specialized analytics or imports when that boundary is justified.
+The application foundation uses Next.js App Router, React, and TypeScript in one responsive web codebase, with Drizzle and standard PostgreSQL persistence tooling. Apache ECharts and progressive web app capabilities are planned for later work. Python and FastAPI may be introduced later for specialized analytics or imports when that boundary is justified.
 
 ## Documentation
 
@@ -15,7 +15,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 ## Status
 
-The initial application scaffold includes a responsive empty-state shell, responsibility boundaries, and a domain unit-test harness. Investment entry, storage, charts, authentication, and PWA installation/offline behavior are not implemented yet.
+The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, and database integration tests. Domain tables, investment entry/storage workflows, charts, authentication, and PWA installation/offline behavior are not implemented yet.
 
 ## Local setup
 
@@ -26,7 +26,7 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). No database, credentials, or environment variables are required. Next.js loads `.env.local` automatically if future local configuration is needed. `.env.example` documents the convention and intentionally has no active keys yet. See [environment configuration](docs/architecture.md#environment-configuration) before adding configuration; never put secrets in `NEXT_PUBLIC_` values.
+Open [localhost:3000](http://localhost:3000). The current empty shell, unit tests, and build do not need a database. Database commands require the setup below. See [environment configuration](docs/architecture.md#environment-configuration); never put secrets in `NEXT_PUBLIC_` values.
 
 ## Project commands
 
@@ -40,10 +40,62 @@ Open [localhost:3000](http://localhost:3000). No database, credentials, or envir
 | `npm test` | Run the unit tests once |
 | `npm run test:watch` | Watch unit tests during development |
 | `npm run check` | Run lint, type checks, tests, and production build in order |
+| `npm run db:up` | Start local PostgreSQL with Docker Compose and wait for readiness |
+| `npm run db:down` | Stop local PostgreSQL, retaining its data volume |
+| `npm run db:generate -- --name=description` | Generate versioned SQL and snapshots from the Drizzle schema |
+| `npm run db:migrate` | Apply pending committed migrations to `DATABASE_URL` |
+| `npm run db:reset` | **Delete the Compose database volume**, restart, and apply migrations |
+| `npm run test:db` | Test migrations and connections in a newly created disposable database |
 
-Run `npm run check` and `git diff --check` before handing off changes. Tests use Vitest's Node environment; the first test exercises the documented active/closed investment entry policy. Add focused tests beside domain code as supported workflows grow.
+Run `npm run check` and `git diff --check` before handing off changes, plus `npm run test:db` when changing persistence or migrations. Unit tests use Vitest's Node environment and cover the active/closed entry policy and database configuration. Database tests are separate so everyday UI/domain development needs no database.
 
 See [architecture](docs/architecture.md#responsibility-boundaries) for the source layout and dependency direction, and [personal-app scope](docs/architecture.md#personal-app-scope) for implementation tradeoffs.
+
+## Local PostgreSQL
+
+Install and start Docker with Compose v2 support (for example, Docker Desktop). Copy `.env.example` to `.env.local` and fill these keys:
+
+```dotenv
+POSTGRES_PASSWORD=<choose-a-local-password>
+DATABASE_URL=postgresql://equinox:<URL-encoded-local-password>@127.0.0.1:5433/equinox
+```
+
+Replace the placeholders; a generated hexadecimal password avoids URL-encoding and environment-interpolation characters. Never commit local environment files. The Compose service uses a Docker-managed volume rather than a repository data directory. Its port is bound only to loopback; port 5433 must be free.
+
+```sh
+npm run db:up
+npm run db:migrate
+```
+
+The initial baseline records migration history without creating domain tables. Stop with `npm run db:down`; data survives. The password initializes a new volume, so changing the environment file does not change an existing database password.
+
+For an intentional **destructive rebuild of disposable local data**, run `npm run db:reset`. It removes the `equinox-local` Compose volume, starts a fresh database, and reapplies migrations. Verify `DATABASE_URL` points to this local database before running it. Do not use this workflow for shared or production data.
+
+An existing standard PostgreSQL service is also supported: set `DATABASE_URL` to that database and run `npm run db:migrate`. Docker is only a development convenience, not a runtime/provider dependency. Configure hosted TLS requirements in the connection URL; certificate verification is not disabled by the adapter.
+
+## Changing the schema
+
+Edit `src/persistence/schema.ts`, then run:
+
+```sh
+npm run db:generate -- --name=describe_the_change
+npm run db:migrate
+npm run test:db
+```
+
+Review and commit the generated SQL, snapshots, and journal under `drizzle/` together with the schema change. Never edit an already-applied migration; add a new one. Production and shared environments must apply committed migrations with `npm run db:migrate`, not ad-hoc schema push. The deployment environment must include the CLI dependencies and `drizzle/` directory when running this command. No migration runs during app rendering or building.
+
+## Database integration tests
+
+Create ignored `.env.test.local` with a maintenance connection on the local service:
+
+```dotenv
+TEST_DATABASE_URL=postgresql://equinox:<URL-encoded-local-password>@127.0.0.1:5433/postgres
+```
+
+Then run `npm run test:db`. The role must have `CREATEDB` permission (the Compose role already does). Tests create a fresh `equinox_test_*` database, use the same migration runner as the CLI, verify reapplication, close connections, and drop only that generated database. They never reset the database named in `DATABASE_URL` or the maintenance connection. A forcibly interrupted run can leave its generated test database for manual cleanup.
+
+CI can supply `TEST_DATABASE_URL` as an environment variable against a clean PostgreSQL 18 service and run `npm ci`, `npm run check`, and `npm run test:db`. To exercise the migration CLI separately, supply `DATABASE_URL` for an empty application database and run `npm run db:migrate`. No provider SDK or Docker-in-Docker is required. Test configuration follows Next.js conventions and does not load `.env.local`; `.env.test.local` and shell variables keep the test target explicit.
 
 ## Data safety
 

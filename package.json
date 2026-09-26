@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "type": "module",
   "engines": {
     "node": "24.x",
     "npm": "11.x"
@@ -16,19 +15,32 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:up": "docker compose --env-file .env.local up -d --wait",
+    "db:down": "docker compose --env-file .env.local down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --conditions=react-server --import tsx scripts/migrate.ts",
+    "db:reset": "docker compose --env-file .env.local down --volumes && npm run db:up && npm run db:migrate",
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
+    "@next/env": "16.3.6",
+    "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
+    "pg": "^8.23.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.3.6",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.0",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"

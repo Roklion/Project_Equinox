@@ -17,6 +17,7 @@ export default defineConfig([
             "@/application/**", "**/application/**",
             "@/persistence/**", "**/persistence/**",
             "next", "next/**", "react", "react-dom", "react-dom/**",
+            "pg", "pg/**", "drizzle-orm", "drizzle-orm/**",
           ],
           message: "Domain rules must remain independent of presentation, workflows, and persistence.",
         }],

@@ -34,14 +34,14 @@ A dynamic aggregation selected by filters or saved grouping rules. It references
 
 ### Action
 
-An immutable or auditable dated economic event affecting an investment. The canonical user-entered action types are:
+A dated economic event affecting an investment. The canonical user-entered action types are:
 
 - **Contribution:** value entering the household's tracked-investment universe from outside that boundary.
 - **Withdrawal/Distribution:** value leaving the household's tracked-investment universe across that boundary.
 - **Transfer:** value moving between two investments within the household boundary.
 - **Valuation Mark:** an observation of gross value and, where applicable, investment-linked debt as of a date.
 
-Corrections may be implemented through explicit edit history, reversal, or replacement semantics. The precise audit mechanism remains an architecture decision; it must preserve explainability and prevent silent loss of financial history.
+No audit-log or change-history subsystem is required in EPIC 1. Correction and deletion behavior must be specified when those workflows are introduced; the foundation does not choose an edit-history, reversal, or replacement mechanism. Closing an investment must still retain its economic history.
 
 ## Transfer representation
 
@@ -75,6 +75,8 @@ An investment can be active or closed. Closing stops ordinary forward data entry
 - Aggregate metrics are recomputed from underlying events and values, never produced by averaging child metrics.
 - Portfolio XIRR uses combined portfolio cash flows and terminal value; investment-level IRRs are never averaged.
 
-## Time and money conventions to decide
+## Time and money conventions
 
-Before persistence is implemented, architecture must define currency representation and rounding, base and multi-currency policy, date/time storage, timezone interpretation, valuation selection between marks, and edit/audit behavior. These decisions affect correctness and should not be implied by UI formatting.
+MVP financial values are USD with exact cent precision. Financial/economic dates are daily calendar dates, not timestamps. Operational metadata may use UTC timestamps but cannot supply or replace an economic effective date. Storage and adapter conventions are owned by [architecture](architecture.md#data-integrity).
+
+Column capacity, handling of input beyond cent precision, calculated/display rounding, valuation selection between marks, and correction/deletion behavior remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.
