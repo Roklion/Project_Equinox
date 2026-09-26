@@ -11,6 +11,11 @@ describe("database environment", () => {
     expect(readDatabaseUrl("DATABASE_URL", { DATABASE_URL: url })).toBe(url);
   });
 
+  it("trims surrounding whitespace before passing a URL to the driver", () => {
+    const url = "postgresql://example:synthetic-password@localhost:5433/equinox";
+    expect(readDatabaseUrl("DATABASE_URL", { DATABASE_URL: ` \n${url}\t ` })).toBe(url);
+  });
+
   it("requires a separate test URL rather than falling back to the application database", () => {
     expect(() => readDatabaseUrl("TEST_DATABASE_URL", {
       DATABASE_URL: "postgres://localhost/equinox",

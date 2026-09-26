@@ -4,8 +4,8 @@ export function readDatabaseUrl(
   key: DatabaseUrlKey = "DATABASE_URL",
   environment: Record<string, string | undefined> = process.env,
 ): string {
-  const value = environment[key];
-  if (!value?.trim()) {
+  const value = environment[key]?.trim();
+  if (!value) {
     throw new Error(`${key} is required for database operations.`);
   }
 

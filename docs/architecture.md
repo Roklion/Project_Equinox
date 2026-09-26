@@ -55,7 +55,7 @@ Never import secrets into domain or client components. The database adapter is m
 
 ## PostgreSQL and migrations
 
-Use Drizzle ORM with the standard `pg` (node-postgres) driver. `src/persistence/database.ts` creates a small connection pool and a typed Drizzle database; the caller owns pool reuse and shutdown. Connections are lazy, so importing the adapter does not contact a database. Driver errors are not printed by the migration CLI or idle-pool handler. The adapter passes the connection URL's TLS options to `pg` without overriding certificate verification. Hosted-provider SDKs are not required.
+Use Drizzle ORM with the standard `pg` (node-postgres) driver. `src/persistence/database.ts` creates a small connection pool and a typed Drizzle database; the caller owns pool reuse and shutdown. Connections are lazy, so importing the adapter does not contact a database. The migration CLI reports the underlying error message and code when available; invalid connection URL errors omit the supplied value. The idle-pool handler logs a generic message rather than the driver error. The adapter passes the connection URL's TLS options to `pg` without overriding certificate verification. Hosted-provider SDKs are not required.
 
 `src/persistence/schema.ts` is the future domain-schema owner. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The initial custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. Subsequent schema tickets generate real DDL from the schema owner.
 
