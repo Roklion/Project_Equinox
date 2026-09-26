@@ -12,6 +12,12 @@ Python and FastAPI may be added later behind a focused service boundary for spec
 
 Streamlit is not the target architecture because polished consumer-facing responsive layouts, reusable interaction patterns, touch behavior, and rich chart interactions are core requirements.
 
+## Personal-app scope
+
+Equinox is a personal app for ordinary household use. Design and implementation should remain proportionate to that context and to the current ticket. Introduce mechanisms when a concrete supported workflow requires them; do not anticipate multi-user scale with generic infrastructure, speculative concurrency coordination, or defenses against impractical manipulation and remote edge cases.
+
+This scope still calls for meaningful financial-data integrity and privacy: exact monetary representations when persistence is added, atomic transfers, preserved history, and clear failures for ordinary invalid input or failed writes. Choose the smallest understandable solution that protects those credible risks. Broader security and deployment decisions remain prerequisites for production use, rather than scaffold features.
+
 ## Responsibility boundaries
 
 The eventual implementation should keep these responsibilities distinct:
@@ -23,7 +29,27 @@ The eventual implementation should keep these responsibilities distinct:
 - **Analytics:** deterministic calculations that operate on dated values and cash flows without depending on UI components.
 - **Import and reconciliation:** explicit adapters that validate external data and preserve provenance without making a private spreadsheet a runtime source of truth.
 
-Exact folder structure, framework conventions, and deployment topology should be chosen during scaffolding rather than fixed prematurely.
+The initial scaffold uses these homes:
+
+| Responsibility | Location |
+| --- | --- |
+| App Router routes, layouts, and global design tokens | `src/app` |
+| Shared presentation components | `src/components` |
+| Application commands and queries | `src/application` |
+| Framework-independent types and financial rules | `src/domain` |
+| Database access, transactions, and migrations | `src/persistence` |
+
+Dependency direction is presentation → application → domain. Persistence is an adapter used by application workflows. Domain code must not depend on Next.js, React, or persistence. ESLint guards imports from the initial higher-level folders; it is a lightweight guardrail, not a substitute for keeping future dependencies within these boundaries. Application and persistence currently contain only placement guidance; introduce concrete implementations as their tickets require them.
+
+Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. Deployment topology remains open.
+
+The scaffold uses Next.js 16.3.6 and React 19.3. ESLint stays on 9 and TypeScript on 6.0 because the current Next.js lint plugins do not support ESLint 10 or TypeScript 7. Revisit these compatible tooling versions when the upstream plugins support newer majors.
+
+## Environment configuration
+
+Use Next.js's built-in environment loading. Local configuration belongs in ignored `.env.local`; `.env.example` must contain only explanatory comments and empty keys. The scaffold requires no application-specific variables, so the example currently contains comments only. Do not invent credentials or provider configuration before a feature needs them.
+
+Future server configuration should be read at the server boundary that needs it, with validation proportionate to that feature's requirements. Never import secrets into domain or client components. Only intentionally public values may use `NEXT_PUBLIC_`, because Next.js embeds those values in browser bundles at build time. Keep local environment files and their contents out of logs and version control.
 
 ## Data integrity
 
