@@ -17,7 +17,12 @@ async function main() {
   }
 }
 
-main().catch(() => {
-  console.error("Migration failed. Check DATABASE_URL, database availability, and the pending migration SQL. Connection details are omitted.");
+main().catch((error: unknown) => {
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  const code = cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string"
+    ? ` [${cause.code}]`
+    : "";
+  const message = cause instanceof Error ? cause.message : "Unknown migration error";
+  console.error(`Migration failed${code}: ${message}`);
   process.exitCode = 1;
 });
