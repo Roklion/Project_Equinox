@@ -10,7 +10,9 @@ export async function POST(request: NextRequest) {
   const hash = process.env.APP_PASSWORD_HASH;
   if (!secret || !hash) return genericFailure();
 
-  const ip = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // Vercel sets x-real-ip from the client connection. Do not trust a client-supplied
+  // X-Forwarded-For value as a fallback; without a trusted IP, share one bucket.
+  const ip = request.headers.get("x-real-ip") ?? "unknown";
   const bucket = loginBucket(ip, secret);
   try {
     if (!await reserveLoginAttempt(bucket)) return genericFailure();

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasValidSession, SESSION_COOKIE } from "@/auth/session";
+import { hasValidSession, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
 import { isSessionActive } from "@/auth/store";
 
 const publicAssets = new Set([
@@ -13,17 +13,25 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   const token = request.cookies.get(SESSION_COOKIE)?.value;
+  let valid = false;
+  let inactive = false;
   if (hasValidSession(token, process.env.SESSION_SECRET)) {
     try {
-      if (await isSessionActive(token!)) return NextResponse.next();
+      valid = await isSessionActive(token!);
+      inactive = !valid;
     } catch {
-      // Database errors fail closed rather than granting access.
+      // Database errors fail closed; preserve the cookie so a transient outage does not erase it.
     }
   }
-  if (path.startsWith("/api/")) {
-    return new NextResponse(null, { status: 401 });
+  if (valid) return NextResponse.next();
+
+  const response = path.startsWith("/api/")
+    ? new NextResponse(null, { status: 401 })
+    : NextResponse.redirect(new URL("/login", request.url));
+  if (token && (!hasValidSession(token, process.env.SESSION_SECRET) || inactive)) {
+    response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions, maxAge: 0 });
   }
-  return NextResponse.redirect(new URL("/login", request.url));
+  return response;
 }
 
 export const config = {

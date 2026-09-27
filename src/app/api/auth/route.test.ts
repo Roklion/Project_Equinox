@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "./login/route";
 import { POST as logout } from "./logout/route";
 import { SESSION_COOKIE } from "@/auth/session";
+import { revokeSession } from "@/auth/store";
 import { proxy } from "@/proxy";
 
 const activeTokens = vi.hoisted(() => new Set<string>());
+const bucketSpy = vi.hoisted(() => vi.fn(() => "synthetic-bucket"));
 vi.mock("@/auth/rate-limit", () => ({
-  loginBucket: () => "synthetic-bucket",
+  loginBucket: bucketSpy,
   reserveLoginAttempt: vi.fn(async () => true),
   clearLoginFailures: vi.fn(async () => {}),
 }));
@@ -24,6 +26,7 @@ const secret = "ab".repeat(32);
 
 beforeEach(() => {
   activeTokens.clear();
+  vi.mocked(revokeSession).mockImplementation(async (token) => { activeTokens.delete(token); });
   const salt = randomBytes(16);
   const hash = scryptSync("synthetic-password", salt, 32, { N: 16384, r: 8, p: 1 });
   process.env.APP_PASSWORD_HASH = `scrypt$16384$8$1$${salt.toString("hex")}$${hash.toString("hex")}`;
@@ -43,6 +46,28 @@ function loginRequest(password: string) {
 }
 
 describe("login and logout", () => {
+  it("uses only the trusted platform IP header for the throttle bucket", async () => {
+    const spoofedOnly = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.44" },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    await login(spoofedOnly);
+    expect(bucketSpy).toHaveBeenLastCalledWith("unknown", secret);
+
+    const platformAddress = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-real-ip": "203.0.113.16",
+        "x-forwarded-for": "198.51.100.44",
+      },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    await login(platformAddress);
+    expect(bucketSpy).toHaveBeenLastCalledWith("203.0.113.16", secret);
+  });
+
   it("rejects an incorrect password without setting a session", async () => {
     const response = await login(loginRequest("wrong-password"));
     expect(response.status).toBe(401);
@@ -63,5 +88,17 @@ describe("login and logout", () => {
     const signedOut = await logout(protectedRequest);
     expect(signedOut.cookies.get(SESSION_COOKIE)?.maxAge).toBe(0);
     expect((await proxy(protectedRequest)).status).toBe(307);
+  });
+
+  it("clears this browser's cookie but reports incomplete server revocation on database failure", async () => {
+    vi.mocked(revokeSession).mockRejectedValueOnce(new Error("database unavailable"));
+    const token = "synthetic-session-token";
+    const request = new NextRequest("http://localhost:3000/api/auth/logout", {
+      method: "POST",
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    const response = await logout(request);
+    expect(response.status).toBe(503);
+    expect(response.cookies.get(SESSION_COOKIE)?.maxAge).toBe(0);
   });
 });

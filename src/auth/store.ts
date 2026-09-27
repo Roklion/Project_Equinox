@@ -1,13 +1,13 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { Pool } from "pg";
-import { readDatabaseUrl } from "@/persistence/environment";
+import { createDatabase } from "@/persistence/database";
 
-let pool: Pool | undefined;
+const globalForAuth = globalThis as typeof globalThis & { equinoxAuthPool?: Pool };
 
 export function authDatabase(): Pool {
-  pool ??= new Pool({ connectionString: readDatabaseUrl(), max: 3 });
-  return pool;
+  globalForAuth.equinoxAuthPool ??= createDatabase().pool;
+  return globalForAuth.equinoxAuthPool;
 }
 
 function tokenHash(token: string): string {
