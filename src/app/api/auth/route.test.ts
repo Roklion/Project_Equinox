@@ -63,6 +63,23 @@ describe("login and logout", () => {
     expect(reserveLoginAttempt).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed JSON without logging it as an operational error", async () => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const malformedRequest = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: "{",
+    });
+
+    const response = await login(malformedRequest);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).toHaveBeenCalledOnce();
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it("uses only the trusted platform IP header for the throttle bucket", async () => {
     const spoofedOnly = new NextRequest("http://localhost:3000/api/auth/login", {
       method: "POST",

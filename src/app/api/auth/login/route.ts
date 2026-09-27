@@ -23,7 +23,12 @@ export async function POST(request: NextRequest) {
   const bucket = loginBucket(ip, secret);
   try {
     if (!await reserveLoginAttempt(bucket)) return genericFailure();
-    const body: unknown = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return genericFailure();
+    }
     const password = typeof body === "object" && body !== null && "password" in body
       ? (body as { password: unknown }).password : undefined;
     if (typeof password !== "string" || password.length > 1024 || !await verifyPassword(password, hash)) {
