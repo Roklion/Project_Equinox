@@ -111,10 +111,10 @@ This is a public repository. Repository content must use generic investment name
 
 Equinox uses one shared app password for the personal MVP. There are no user accounts, signup, or per-household permissions. All application and API routes require a signed session except the sign-in route and public static assets. Sessions use an HttpOnly, SameSite=Lax cookie, Secure in production, and expire after seven days. Sign out revokes the current server-side session and clears its browser cookie.
 
-Choose a strong password and create its scrypt hash locally with `node scripts/auth-secrets.mjs hash`. The prompt does not echo the password. Create an independent 256-bit signing secret with `node scripts/auth-secrets.mjs secret`. Put the resulting values in ignored `.env.local` for local use:
+Choose a strong password and create its scrypt hash locally with `node scripts/auth-secrets.mjs hash`. The prompt does not echo the password. Create an independent 256-bit signing secret with `node scripts/auth-secrets.mjs secret`. Next.js expands dollar-sign references when loading `.env.local`, so escape each dollar sign in the generated hash as `\$` in that file; Next.js removes the escape and passes the original hash to the app. Enter the unescaped hash in Vercel. Put the values in ignored `.env.local` for local use:
 
 ```dotenv
-APP_PASSWORD_HASH=<locally-generated-scrypt-hash>
+APP_PASSWORD_HASH=scrypt\$16384\$8\$1\$<salt>\$<digest>
 SESSION_SECRET=<locally-generated-hex-secret>
 ```
 
