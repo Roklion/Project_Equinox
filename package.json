@@ -24,6 +24,8 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
+    "@neon/config": "^1.8.2",
+    "@neon/env": "^1.4.7",
     "@next/env": "16.3.6",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
