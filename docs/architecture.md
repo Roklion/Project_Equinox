@@ -41,7 +41,7 @@ The initial scaffold uses these homes:
 
 Dependency direction is presentation → application → domain. Persistence is an adapter used by application workflows. Domain code must not depend on Next.js, React, or persistence. ESLint guards imports from the initial higher-level folders; it is a lightweight guardrail, not a substitute for keeping future dependencies within these boundaries. Application workflows remain future work; persistence now provides a PostgreSQL connection factory and migration runner without domain tables.
 
-Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. Deployment topology remains open.
+Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. The personal MVP targets Vercel Hobby and Neon Free; hosted provisioning and validation are owned by issue 16.
 
 The scaffold uses Next.js 16.3.6 and React 19.3. ESLint stays on 9 and TypeScript on 6.0 because the current Next.js lint plugins do not support ESLint 10 or TypeScript 7. Revisit these compatible tooling versions when the upstream plugins support newer majors.
 
@@ -88,7 +88,7 @@ Desktop and mobile should share domain and presentation primitives while composi
 
 This public repository must contain only generic names and synthetic financial values. Real personal data and private-spreadsheet content or derivatives must remain outside version control.
 
-Before production use, architecture must define authentication, authorization, intended household access, encryption, secret management, backups, deletion, and sensitive telemetry rules. Audit retention is relevant only if an audit subsystem is introduced later. Logs and error reports must avoid financial records and identifiers by default.
+Authentication for the single-household MVP is defined below. Before production use, encryption, secret management, backups, deletion, and sensitive telemetry rules still require validation. Audit retention is relevant only if an audit subsystem is introduced later. Logs and error reports must avoid financial records and identifiers by default.
 
 ## Validation strategy
 
@@ -116,3 +116,7 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 - whether and when imports justify a separate Python service.
 
 Multi-currency support and foreign exchange are outside the USD-only MVP.
+
+## Authentication boundary
+
+The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie; other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.

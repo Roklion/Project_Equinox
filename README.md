@@ -15,7 +15,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 ## Status
 
-The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, and database integration tests. Domain tables, investment entry/storage workflows, charts, authentication, and PWA installation/offline behavior are not implemented yet.
+The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, and database integration tests. Domain tables, investment entry/storage workflows, charts and PWA installation/offline behavior are not implemented yet.
 
 ## Local setup
 
@@ -26,7 +26,7 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The current empty shell, unit tests, and build do not need a database. Database commands require the setup below. See [environment configuration](docs/architecture.md#environment-configuration); never put secrets in `NEXT_PUBLIC_` values.
+Open [localhost:3000](http://localhost:3000). Unit tests and the production build do not need a database. Signing in requires the database and authentication setup below. See [environment configuration](docs/architecture.md#environment-configuration); never put secrets in `NEXT_PUBLIC_` values.
 
 ## Project commands
 
@@ -67,7 +67,7 @@ npm run db:up
 npm run db:migrate
 ```
 
-The initial baseline records migration history without creating domain tables. Stop with `npm run db:down`; data survives. The password initializes a new volume, so changing the environment file does not change an existing database password.
+The baseline records migration history; authentication migrations create failed-login throttling and session tables without introducing financial domain tables. Stop with `npm run db:down`; data survives. The password initializes a new volume, so changing the environment file does not change an existing database password.
 
 For an intentional **destructive rebuild of disposable local data**, run `npm run db:reset`. It removes the `equinox-local` Compose volume, starts a fresh database, and reapplies migrations. Verify `DATABASE_URL` points to this local database before running it. Do not use this workflow for shared or production data.
 
@@ -95,8 +95,25 @@ TEST_DATABASE_URL=postgresql://equinox:<URL-encoded-local-password>@127.0.0.1:54
 
 Then run `npm run test:db`. The role must have `CREATEDB` permission (the Compose role already does). Tests create a fresh `equinox_test_*` database, use the same migration runner as the CLI, verify reapplication, close connections, and drop only that generated database. They never reset the database named in `DATABASE_URL` or the maintenance connection. A forcibly interrupted run can leave its generated test database for manual cleanup.
 
-CI can supply `TEST_DATABASE_URL` as an environment variable against a clean PostgreSQL 18 service and run `npm ci`, `npm run check`, and `npm run test:db`. To exercise the migration CLI separately, supply `DATABASE_URL` for an empty application database and run `npm run db:migrate`. No provider SDK or Docker-in-Docker is required. Test configuration follows Next.js conventions and does not load `.env.local`; `.env.test.local` and shell variables keep the test target explicit.
+CI supplies `TEST_DATABASE_URL` and `DATABASE_URL` against its ephemeral PostgreSQL 18 service, runs `npm ci`, `npm run check`, `npm run db:migrate`, and `npm run test:db`. To exercise the migration CLI separately, supply `DATABASE_URL` for an empty application database and run `npm run db:migrate`. No provider SDK or Docker-in-Docker is required. Test configuration follows Next.js conventions and does not load `.env.local`; `.env.test.local` and shell variables keep the test target explicit.
 
 ## Data safety
 
 This is a public repository. Repository content must use generic investment names and synthetic values. Real personal financial data, portfolio values, account identifiers, private institution or account details, and material copied or derived from a private investment spreadsheet must never be committed.
+
+## Authentication
+
+Equinox uses one shared app password for the personal MVP. There are no user accounts, signup, or per-household permissions. All application and API routes require a signed session except the sign-in route and public static assets. Sessions use an HttpOnly, SameSite=Lax cookie, Secure in production, and expire after seven days. Sign out revokes the current server-side session and clears its browser cookie.
+
+Choose a strong password and create its scrypt hash locally with `node scripts/auth-secrets.mjs hash`. The prompt does not echo the password. Create an independent 256-bit signing secret with `node scripts/auth-secrets.mjs secret`. Put the resulting values in ignored `.env.local` for local use:
+
+```dotenv
+APP_PASSWORD_HASH=<locally-generated-scrypt-hash>
+SESSION_SECRET=<locally-generated-hex-secret>
+```
+
+The app also requires `DATABASE_URL` at login for PostgreSQL-backed failed-attempt throttling. Apply migrations first with `npm run db:migrate`. Five failed attempts from an IP address within 15 minutes trigger a temporary rejection; the database is required for successful login. For production, set the hash, session secret, and database URL only in Vercel environment configuration. Never place the raw password, hash, or signing secret in GitHub, logs, or any `NEXT_PUBLIC_` variable. Configure these secrets and validate the hosted login flow before entering real financial data.
+
+## Continuous integration
+
+GitHub Actions runs `npm ci`, lint, type checking, unit tests, a clean database migration, PostgreSQL integration tests, production build, and whitespace validation on pull requests and pushes to `main`. The workflow uses a disposable PostgreSQL service and synthetic test data; it needs no hosted database or deployment credentials.

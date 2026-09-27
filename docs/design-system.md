@@ -69,3 +69,7 @@ Likely reusable components include value summaries, metric cards, as-of labels, 
 - chart behavior for sparse or irregular valuation marks;
 - density and interaction model for large investment lists; and
 - offline, install, and update prompts for the PWA.
+
+## Authentication screen
+
+The password-only sign-in screen uses the shell's existing color, type, spacing, focus, and surface tokens. It provides one labeled password field, one primary action, and a generic failure message. The overview exposes a sign-out action after authentication. The flow has no username, account creation, or password recovery controls in the personal MVP.
