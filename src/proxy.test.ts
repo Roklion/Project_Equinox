@@ -11,7 +11,8 @@ vi.mock("@/auth/store", () => ({
 const secret = "ab".repeat(32);
 const oldSecret = process.env.SESSION_SECRET;
 afterEach(() => {
-  process.env.SESSION_SECRET = oldSecret;
+  if (oldSecret === undefined) delete process.env.SESSION_SECRET;
+  else process.env.SESSION_SECRET = oldSecret;
   vi.mocked(isSessionActive).mockResolvedValue(true);
   vi.restoreAllMocks();
 });
@@ -22,6 +23,37 @@ describe("route protection", () => {
     expect((await proxy(new NextRequest("http://localhost:3000/"))).status).toBe(307);
     expect((await proxy(new NextRequest("http://localhost:3000/api/investments"))).status).toBe(401);
     expect((await proxy(new NextRequest("http://localhost:3000/icon-secret"))).status).toBe(307);
+  });
+
+  it("allows public PWA icons before sign-in", async () => {
+    process.env.SESSION_SECRET = secret;
+    for (const path of ["/icon-192.png", "/icon-512.png"]) {
+      expect((await proxy(new NextRequest(`http://localhost:3000${path}`))).status).toBe(200);
+    }
+  });
+
+  it("preserves session cookies and fails closed when session configuration is missing", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    process.env.SESSION_SECRET = secret;
+    const token = createSession(secret);
+    delete process.env.SESSION_SECRET;
+
+    const pageRequest = new NextRequest("http://localhost:3000/", {
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    const pageResponse = await proxy(pageRequest);
+    expect(pageResponse.status).toBe(307);
+    expect(pageResponse.cookies.get(SESSION_COOKIE)).toBeUndefined();
+
+    const apiRequest = new NextRequest("http://localhost:3000/api/investments", {
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    const apiResponse = await proxy(apiRequest);
+    expect(apiResponse.status).toBe(500);
+    expect(apiResponse.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(isSessionActive).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith("Session validation is unavailable because SESSION_SECRET is not configured.");
   });
 
   it("allows a signed, active session", async () => {
