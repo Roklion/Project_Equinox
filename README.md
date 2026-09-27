@@ -16,7 +16,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 ## Status
 
-The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, and installable PWA metadata. Domain tables, investment entry/storage workflows, and charts are not implemented yet. Offline financial-data behavior is intentionally deferred.
+The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, installable PWA metadata, canonical financial domain tables, and persistence/application services for investment lifecycle, actions, valuations, and history queries. User-facing investment entry workflows and charts are not implemented yet. Offline financial-data behavior is intentionally deferred.
 
 ## Local setup
 
