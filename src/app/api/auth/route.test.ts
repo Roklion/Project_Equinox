@@ -35,6 +35,7 @@ beforeEach(() => {
 afterEach(() => {
   process.env.APP_PASSWORD_HASH = originalHash;
   process.env.SESSION_SECRET = originalSecret;
+  vi.restoreAllMocks();
 });
 
 function loginRequest(password: string) {
@@ -90,15 +91,18 @@ describe("login and logout", () => {
     expect((await proxy(protectedRequest)).status).toBe(307);
   });
 
-  it("clears this browser's cookie but reports incomplete server revocation on database failure", async () => {
-    vi.mocked(revokeSession).mockRejectedValueOnce(new Error("database unavailable"));
+  it("preserves the token and reports incomplete revocation on database failure", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(revokeSession).mockRejectedValueOnce(new Error("postgres://synthetic-secret@localhost"));
     const token = "synthetic-session-token";
     const request = new NextRequest("http://localhost:3000/api/auth/logout", {
       method: "POST",
-      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+      headers: { cookie: SESSION_COOKIE + "=" + token },
     });
     const response = await logout(request);
     expect(response.status).toBe(503);
-    expect(response.cookies.get(SESSION_COOKIE)?.maxAge).toBe(0);
+    expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(log).toHaveBeenCalledWith("Session revocation failed during logout.");
   });
 });

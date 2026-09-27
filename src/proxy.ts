@@ -9,7 +9,7 @@ const publicAssets = new Set([
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  if (path === "/login" || path === "/api/auth/login" || publicAssets.has(path)) {
+  if (path === "/login" || path === "/api/auth/login" || path === "/api/auth/logout" || publicAssets.has(path)) {
     return NextResponse.next();
   }
   const token = request.cookies.get(SESSION_COOKIE)?.value;

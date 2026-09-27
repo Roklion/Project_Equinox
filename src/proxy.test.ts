@@ -31,6 +31,17 @@ describe("route protection", () => {
     expect((await proxy(request)).status).toBe(200);
   });
 
+  it("lets expired sessions reach logout so the route can clear them", async () => {
+    process.env.SESSION_SECRET = secret;
+    vi.mocked(isSessionActive).mockResolvedValue(false);
+    const request = new NextRequest("http://localhost:3000/api/auth/logout", {
+      method: "POST",
+      headers: { cookie: SESSION_COOKIE + "=" + createSession(secret) },
+    });
+    const response = await proxy(request);
+    expect(response.status).toBe(200);
+    expect(isSessionActive).not.toHaveBeenCalled();
+  });
   it("clears a revoked session cookie to avoid repeating its database lookup", async () => {
     process.env.SESSION_SECRET = secret;
     vi.mocked(isSessionActive).mockResolvedValue(false);
