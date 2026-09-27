@@ -4,7 +4,7 @@ import { assertCalendarDate, formatCents, parseCents, type Provenance } from "@/
 import type { PortfolioRepository, ReplaceValuationMark, StoredMovement } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
-  actions, investmentGroups, investmentOwners, investments, movements, valuationMarks,
+  actions, investmentOwners, investments, movements, valuationMarks,
 } from "./schema";
 
 type Database = ReturnType<typeof createDatabase>["db"];
@@ -39,10 +39,6 @@ export async function createInvestment(db: Database, input: {
     })));
     return investment;
   });
-}
-
-export async function addInvestmentGroup(db: Database, householdId: string, investmentId: string, groupId: string) {
-  await db.insert(investmentGroups).values({ householdId, investmentId, groupId });
 }
 
 export async function closeInvestment(db: Database, householdId: string, investmentId: string, closedOn: string) {

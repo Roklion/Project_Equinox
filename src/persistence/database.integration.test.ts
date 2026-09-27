@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -115,9 +115,9 @@ describe("PostgreSQL persistence", () => {
     const transfer = await recordTransfer(db, { householdId: home.id, sourceInvestmentId: source.id,
       destinationInvestmentId: destination.id, effectiveDate: "2026-02-03", amount: "125.25" });
     expect(await db.select({ role: movements.role, direction: movements.direction, amount: movements.amount })
-      .from(movements).where(eq(movements.actionId, transfer.id))).toEqual([
-      { role: "source", direction: "out", amount: "125.25" },
+      .from(movements).where(eq(movements.actionId, transfer.id)).orderBy(asc(movements.role))).toEqual([
       { role: "destination", direction: "in", amount: "125.25" },
+      { role: "source", direction: "out", amount: "125.25" },
     ]);
     await expect(recordTransfer(db, { householdId: home.id, sourceInvestmentId: source.id,
       destinationInvestmentId: source.id, effectiveDate: "2026-02-04", amount: "1.00" })).rejects.toThrow();
@@ -149,15 +149,15 @@ describe("PostgreSQL persistence", () => {
     const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
     const investment = await service.createInvestment({ householdId: home.id, name: "Sample holding", ownerIds: [owner.id] });
     const original = await service.recordValuationMark({ householdId: home.id, investmentId: investment.id,
-      asOfDate: "2026-04-01", grossValue: "100.00", source: "manual", sourceReference: "synthetic-ref" });
+      asOfDate: "2026-04-01", grossValue: "100.00", source: "manual", sourceReference: "synthetic-ref", notes: "Synthetic note" });
     await service.closeInvestment(home.id, investment.id, "2026-04-02");
     const replacement = await service.replaceValuationMark({ householdId: home.id, investmentId: investment.id,
-      asOfDate: "2026-04-01", debt: "125.00" });
+      asOfDate: "2026-04-01", debt: "125.00", source: null, sourceReference: null, notes: null });
     expect(replacement.id).toBe(original.id);
     const history = await service.getInvestmentHistory(home.id, investment.id);
     expect(history.marks).toEqual([expect.objectContaining({ id: original.id, asOfDate: "2026-04-01",
       grossValue: "100.00", debt: "125.00", netValue: "-25.00",
-      source: "manual", sourceReference: "synthetic-ref" })]);
+      source: null, sourceReference: null, notes: null })]);
     expect(history.movements).toEqual([]);
     await expect(service.recordValuationMark({ householdId: home.id, investmentId: investment.id,
       asOfDate: "2026-04-01", grossValue: "1.00" })).rejects.toThrow();

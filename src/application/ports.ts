@@ -19,7 +19,12 @@ export type WriteValuationMark = {
   householdId: HouseholdId; investmentId: InvestmentId; asOfDate: string;
   grossValue: string; debt?: string;
 } & Provenance;
-export type ReplaceValuationMark = Omit<WriteValuationMark, "grossValue"> & { grossValue?: string };
+export type ReplaceValuationMark = Omit<WriteValuationMark, "grossValue" | "source" | "sourceReference" | "notes"> & {
+  grossValue?: string;
+  source?: Provenance["source"] | null;
+  sourceReference?: Provenance["sourceReference"] | null;
+  notes?: Provenance["notes"] | null;
+};
 
 export type StoredMovement = {
   actionId: string; kind: ActionKind; effectiveDate: string;

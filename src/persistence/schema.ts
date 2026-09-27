@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, date, foreignKey, numeric, pgTable, primaryKey, text, unique, uuid } from "drizzle-orm/pg-core";
+import { check, date, foreignKey, index, numeric, pgTable, primaryKey, text, unique, uuid } from "drizzle-orm/pg-core";
 
 const id = (name: string) => uuid(name).defaultRandom().notNull();
 const money = (name: string) => numeric(name, { precision: 18, scale: 2 }).notNull();
@@ -89,6 +89,7 @@ export const movements = pgTable("movements", {
   role: text("role").notNull(), direction: text("direction").notNull(), amount: money("amount"),
 }, (t) => [
   unique("movements_action_role").on(t.actionId, t.role),
+  index("movements_household_investment_idx").on(t.householdId, t.investmentId),
   foreignKey({ columns: [t.householdId, t.actionId], foreignColumns: [actions.householdId, actions.id] }),
   foreignKey({ columns: [t.householdId, t.investmentId], foreignColumns: [investments.householdId, investments.id] }),
   check("movements_role", sql`${t.role} in ('external', 'source', 'destination')`),

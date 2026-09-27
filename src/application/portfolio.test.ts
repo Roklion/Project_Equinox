@@ -63,4 +63,14 @@ describe("portfolio application service", () => {
     expect(history.marks[0].netValue).toBe("-1.00");
     expect(history.movements).toEqual([]);
   });
+
+  it("allows explicit clearing of nullable valuation provenance", async () => {
+    const repository = fakeRepository();
+    const service = createPortfolioService(repository);
+    await service.replaceValuationMark({ householdId: "home", investmentId: "investment-a",
+      asOfDate: "2026-03-01", source: null, sourceReference: null, notes: null });
+    expect(repository.replaceValuationMark).toHaveBeenCalledWith(expect.objectContaining({
+      source: null, sourceReference: null, notes: null,
+    }));
+  });
 });

@@ -1,0 +1,1 @@
+CREATE INDEX "movements_household_investment_idx" ON "movements" USING btree ("household_id","investment_id");
