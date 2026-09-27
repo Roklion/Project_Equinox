@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hasValidSession, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
+import { hasValidSession, isValidSessionSecret, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
 import { isSessionActive } from "@/auth/store";
 
 const publicAssets = new Set([
@@ -13,8 +13,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   const secret = process.env.SESSION_SECRET;
-  if (!secret) {
-    console.error("Session validation is unavailable because SESSION_SECRET is not configured.");
+  if (!isValidSessionSecret(secret)) {
+    console.error("Session validation is unavailable because SESSION_SECRET is missing or invalid.");
     return path.startsWith("/api/")
       ? new NextResponse(null, { status: 500 })
       : NextResponse.redirect(new URL("/login", request.url));

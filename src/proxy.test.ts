@@ -53,7 +53,31 @@ describe("route protection", () => {
     expect(apiResponse.cookies.get(SESSION_COOKIE)).toBeUndefined();
     expect(isSessionActive).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledTimes(2);
-    expect(log).toHaveBeenCalledWith("Session validation is unavailable because SESSION_SECRET is not configured.");
+    expect(log).toHaveBeenCalledWith("Session validation is unavailable because SESSION_SECRET is missing or invalid.");
+  });
+
+  it("preserves session cookies and fails closed when session configuration is malformed", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    process.env.SESSION_SECRET = secret;
+    const token = createSession(secret);
+    process.env.SESSION_SECRET = "not-a-hex-signing-key";
+
+    const pageRequest = new NextRequest("http://localhost:3000/", {
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    const pageResponse = await proxy(pageRequest);
+    expect(pageResponse.status).toBe(307);
+    expect(pageResponse.cookies.get(SESSION_COOKIE)).toBeUndefined();
+
+    const apiRequest = new NextRequest("http://localhost:3000/api/investments", {
+      headers: { cookie: `${SESSION_COOKIE}=${token}` },
+    });
+    const apiResponse = await proxy(apiRequest);
+    expect(apiResponse.status).toBe(500);
+    expect(apiResponse.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(isSessionActive).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith("Session validation is unavailable because SESSION_SECRET is missing or invalid.");
   });
 
   it("allows a signed, active session", async () => {
