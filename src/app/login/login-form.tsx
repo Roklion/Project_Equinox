@@ -1,15 +1,14 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 export function LoginForm() {
-  const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setError("");
     setBusy(true);
     const data = new FormData(event.currentTarget);
@@ -23,8 +22,7 @@ export function LoginForm() {
         setError("Unable to sign in. Check your password and try again later.");
         return;
       }
-      router.replace("/");
-      router.refresh();
+      window.location.assign(new URL("/", window.location.href));
     } catch {
       setError("Unable to sign in. Please try again later.");
     } finally {
