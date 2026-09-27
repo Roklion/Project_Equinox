@@ -142,6 +142,37 @@ describe("PostgreSQL persistence", () => {
     expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, source.id))).toHaveLength(1);
   });
 
+  it("allows historical backfills on closed investments but rejects activity after closure", async () => {
+    const { db } = connection!;
+    const service = createPortfolioService(createPostgresPortfolioRepository(db));
+    const [home] = await db.insert(households).values({ name: "Historical backfill sample" }).returning();
+    const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
+    const closed = await service.createInvestment({ householdId: home.id, name: "Closed sample", ownerIds: [owner.id] });
+    const active = await service.createInvestment({ householdId: home.id, name: "Active sample", ownerIds: [owner.id] });
+    await service.closeInvestment(home.id, closed.id, "2026-05-10");
+
+    await service.recordExternalAction({ householdId: home.id, investmentId: closed.id,
+      kind: "contribution", effectiveDate: "2026-05-09", amount: "10.00" });
+    await service.recordTransfer({ householdId: home.id, sourceInvestmentId: closed.id,
+      destinationInvestmentId: active.id, effectiveDate: "2026-05-10", amount: "3.00" });
+    await service.recordValuationMark({ householdId: home.id, investmentId: closed.id,
+      asOfDate: "2026-05-08", grossValue: "20.00" });
+
+    const history = await service.getInvestmentHistory(home.id, closed.id);
+    expect(history.movements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "contribution", effectiveDate: "2026-05-09" }),
+      expect.objectContaining({ kind: "transfer", effectiveDate: "2026-05-10", role: "source" }),
+    ]));
+    expect(history.marks).toEqual([expect.objectContaining({ asOfDate: "2026-05-08", grossValue: "20.00" })]);
+
+    await expect(service.recordExternalAction({ householdId: home.id, investmentId: closed.id,
+      kind: "contribution", effectiveDate: "2026-05-11", amount: "1.00" })).rejects.toThrow();
+    await expect(service.recordTransfer({ householdId: home.id, sourceInvestmentId: closed.id,
+      destinationInvestmentId: active.id, effectiveDate: "2026-05-11", amount: "1.00" })).rejects.toThrow();
+    await expect(service.recordValuationMark({ householdId: home.id, investmentId: closed.id,
+      asOfDate: "2026-05-11", grossValue: "21.00" })).rejects.toThrow();
+  });
+
   it("corrects one historical mark in place through the application boundary", async () => {
     const { db } = connection!;
     const service = createPortfolioService(createPostgresPortfolioRepository(db));

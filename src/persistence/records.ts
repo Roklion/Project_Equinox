@@ -14,10 +14,15 @@ function exactAmount(value: string, allowZero = false): string {
   return formatCents(parseCents(value, allowZero));
 }
 
-async function requireActiveInvestment(db: Transaction, householdId: string, investmentId: string) {
-  const [investment] = await db.select({ status: investments.status }).from(investments)
+async function requireValidActivityDate(
+  db: Transaction, householdId: string, investmentId: string, activityDate: string,
+) {
+  const [investment] = await db.select({ status: investments.status, closedOn: investments.closedOn }).from(investments)
     .where(and(eq(investments.householdId, householdId), eq(investments.id, investmentId)));
-  if (!investment || investment.status !== "active") throw new Error("Investment is unavailable for new activity.");
+  if (!investment || (investment.status === "closed" &&
+    (!investment.closedOn || activityDate > investment.closedOn))) {
+    throw new Error("Investment is unavailable for activity on this date.");
+  }
 }
 
 /** Create an investment and all owner links together, with no ownerless committed row. */
@@ -57,7 +62,7 @@ export async function recordExternalAction(db: Database, input: {
   assertCalendarDate(input.effectiveDate);
   const amount = exactAmount(input.amount);
   return db.transaction(async (tx) => {
-    await requireActiveInvestment(tx, input.householdId, input.investmentId);
+    await requireValidActivityDate(tx, input.householdId, input.investmentId, input.effectiveDate);
     const [action] = await tx.insert(actions).values({
       householdId: input.householdId, kind: input.kind, effectiveDate: input.effectiveDate,
       amount, source: input.source, sourceReference: input.sourceReference, notes: input.notes,
@@ -78,8 +83,8 @@ export async function recordTransfer(db: Database, input: {
   const amount = exactAmount(input.amount);
   if (input.sourceInvestmentId === input.destinationInvestmentId) throw new Error("Transfer needs distinct investments.");
   return db.transaction(async (tx) => {
-    await requireActiveInvestment(tx, input.householdId, input.sourceInvestmentId);
-    await requireActiveInvestment(tx, input.householdId, input.destinationInvestmentId);
+    await requireValidActivityDate(tx, input.householdId, input.sourceInvestmentId, input.effectiveDate);
+    await requireValidActivityDate(tx, input.householdId, input.destinationInvestmentId, input.effectiveDate);
     const [action] = await tx.insert(actions).values({
       householdId: input.householdId, kind: "transfer", effectiveDate: input.effectiveDate,
       amount, source: input.source, sourceReference: input.sourceReference, notes: input.notes,
@@ -102,7 +107,7 @@ export async function recordValuationMark(db: Database, input: {
   const grossValue = exactAmount(input.grossValue, true);
   const debt = exactAmount(input.debt ?? "0", true);
   return db.transaction(async (tx) => {
-    await requireActiveInvestment(tx, input.householdId, input.investmentId);
+    await requireValidActivityDate(tx, input.householdId, input.investmentId, input.asOfDate);
     const [mark] = await tx.insert(valuationMarks).values({
       householdId: input.householdId, investmentId: input.investmentId, asOfDate: input.asOfDate,
       grossValue, debt, source: input.source, sourceReference: input.sourceReference, notes: input.notes,
