@@ -2,7 +2,7 @@
 
 Project Equinox is a personal investment and wealth tracker designed for desktop and iPhone. It gives a household a clear view of investment values, cash flows, performance, and composition without requiring security or tax-lot accounting.
 
-The application foundation uses Next.js App Router, React, and TypeScript in one responsive web codebase, with Drizzle and standard PostgreSQL persistence tooling. Apache ECharts and progressive web app capabilities are planned for later work. Python and FastAPI may be introduced later for specialized analytics or imports when that boundary is justified.
+The application foundation uses Next.js App Router, React, and TypeScript in one responsive web codebase, with Drizzle and standard PostgreSQL persistence tooling. Installable PWA metadata is implemented for online use; Apache ECharts remains planned. Python and FastAPI may be introduced later for specialized analytics or imports when that boundary is justified.
 
 ## Documentation
 
@@ -11,11 +11,12 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 - [Metrics](docs/metrics.md) defines financial measures and aggregation rules.
 - [Design system](docs/design-system.md) defines interface and interaction direction.
 - [Architecture](docs/architecture.md) defines technical boundaries and the initial platform direction.
+- [Installable app validation](docs/pwa-validation.md) lists desktop and iPhone checks for the online-only experience.
 - [Agent guidance](AGENTS.md) defines repository working practices.
 
 ## Status
 
-The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, and database integration tests. Domain tables, investment entry/storage workflows, charts, authentication, and PWA installation/offline behavior are not implemented yet.
+The foundation includes a responsive empty-state shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, and installable PWA metadata. Domain tables, investment entry/storage workflows, charts, and authentication are not implemented yet. Offline financial-data behavior is intentionally deferred.
 
 ## Local setup
 
