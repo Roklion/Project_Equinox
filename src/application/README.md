@@ -1,5 +1,5 @@
 # Application workflows
 
-Place concrete commands and queries here as workflows are implemented. Coordinate domain rules and persistence adapters without importing routes or components. No workflow or repository interfaces are needed for the initial empty shell.
+`ports.ts` defines the canonical repository contract without framework or SQL types. `portfolio.ts` validates money and calendar dates and exposes the small EPIC 1 command/query surface. Construct it with `createPortfolioService(createPostgresPortfolioRepository(db))` on the server. Full user-facing workflows and API routes belong to later tickets.
 
 See [architecture](../../docs/architecture.md) for the dependency direction and [the data model](../../docs/data-model.md) for canonical semantics.

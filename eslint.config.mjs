@@ -25,12 +25,23 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/{application,persistence}/**/*.ts"],
+    files: ["src/persistence/**/*.ts"],
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{
           group: presentationImports,
           message: "Application workflows and persistence must not depend on presentation.",
+        }],
+      }],
+    },
+  },
+  {
+    files: ["src/application/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: [...presentationImports, "@/persistence/**", "**/persistence/**", "pg", "pg/**", "drizzle-orm", "drizzle-orm/**"],
+          message: "Application services use repository ports, not database adapters or SQL types.",
         }],
       }],
     },

@@ -41,7 +41,7 @@ A dated economic event affecting an investment. The canonical user-entered actio
 - **Transfer:** value moving between two investments within the household boundary.
 - **Valuation Mark:** an observation of gross value and, where applicable, investment-linked debt as of a date.
 
-No audit-log or change-history subsystem is required in EPIC 1. Correction and deletion behavior must be specified when those workflows are introduced; the foundation does not choose an edit-history, reversal, or replacement mechanism. Closing an investment must still retain its economic history.
+No audit-log or change-history subsystem is required in EPIC 1. Existing valuation marks may be corrected explicitly in place while retaining their investment/date identity; the application does not silently replace a mark when recording a new one. User-facing edit and deletion rules for other records belong to later workflows. Closing an investment must still retain its economic history.
 
 ## Transfer representation
 
@@ -57,7 +57,7 @@ Every valuation mark has an as-of date and identifies its investment. A mark rec
 
 Debt may exceed gross value; negative net investment value is valid. A mark is an observation, not a cash flow.
 
-The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. Correction/replacement behavior is deferred until the editing workflow is designed; no silent overwrite occurs.
+The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. An explicit replacement operation updates an existing mark on that date in place, including a historical mark on a closed investment. It fails if no mark exists; no silent insert or overwrite occurs.
 
 ## Lifecycle
 
@@ -79,4 +79,4 @@ An investment can be active or closed. Closing stops ordinary forward data entry
 
 MVP financial values are USD with exact cent precision. Financial/economic dates are daily calendar dates, not timestamps. Operational metadata may use UTC timestamps but cannot supply or replace an economic effective date. Storage and adapter conventions are owned by [architecture](architecture.md#data-integrity).
 
-Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The recording adapter accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Valuation selection between dates, calculated/display rounding, and correction/deletion behavior remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.
+Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The application service accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Valuation selection between dates, calculated/display rounding, and user-facing correction/deletion rules remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.

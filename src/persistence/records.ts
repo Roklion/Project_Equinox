@@ -1,6 +1,7 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { assertCalendarDate, formatCents, parseCents, type Provenance } from "@/domain/financial";
+import type { PortfolioRepository, ReplaceValuationMark, StoredMovement } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
   actions, investmentGroups, investmentOwners, investments, movements, valuationMarks,
@@ -112,4 +113,54 @@ export async function recordValuationMark(db: Database, input: {
     }).returning();
     return mark;
   });
+}
+
+/** Correct a known mark in place. The investment/date identity and row ID remain stable. */
+export async function replaceValuationMark(db: Database, input: ReplaceValuationMark) {
+  assertCalendarDate(input.asOfDate);
+  if ([input.grossValue, input.debt, input.source, input.sourceReference, input.notes]
+    .every((value) => value === undefined)) throw new Error("A mark correction needs a changed field.");
+  const [mark] = await db.update(valuationMarks).set({
+    grossValue: input.grossValue === undefined ? undefined : exactAmount(input.grossValue, true),
+    debt: input.debt === undefined ? undefined : exactAmount(input.debt, true),
+    source: input.source, sourceReference: input.sourceReference, notes: input.notes,
+  }).where(and(
+    eq(valuationMarks.householdId, input.householdId),
+    eq(valuationMarks.investmentId, input.investmentId),
+    eq(valuationMarks.asOfDate, input.asOfDate),
+  )).returning();
+  if (!mark) throw new Error("Valuation mark not found for replacement.");
+  return mark;
+}
+
+export async function getInvestmentHistory(db: Database, householdId: string, investmentId: string) {
+  const movementRows = await db.select({
+    actionId: actions.id, kind: actions.kind, effectiveDate: actions.effectiveDate,
+    investmentId: movements.investmentId, role: movements.role,
+    direction: movements.direction, amount: movements.amount,
+    source: actions.source, sourceReference: actions.sourceReference, notes: actions.notes,
+  }).from(movements).innerJoin(actions, eq(movements.actionId, actions.id))
+    .where(and(eq(movements.householdId, householdId), eq(movements.investmentId, investmentId)))
+    .orderBy(asc(actions.effectiveDate));
+  const marks = await db.select({
+    id: valuationMarks.id, asOfDate: valuationMarks.asOfDate,
+    grossValue: valuationMarks.grossValue, debt: valuationMarks.debt,
+    source: valuationMarks.source, sourceReference: valuationMarks.sourceReference, notes: valuationMarks.notes,
+  }).from(valuationMarks).where(and(
+    eq(valuationMarks.householdId, householdId), eq(valuationMarks.investmentId, investmentId),
+  )).orderBy(asc(valuationMarks.asOfDate));
+  // SQL checks constrain these text columns to the domain's closed unions.
+  return { movements: movementRows as StoredMovement[], marks };
+}
+
+export function createPostgresPortfolioRepository(db: Database): PortfolioRepository {
+  return {
+    createInvestment: (input) => createInvestment(db, input),
+    closeInvestment: (householdId, investmentId, closedOn) => closeInvestment(db, householdId, investmentId, closedOn),
+    recordExternalAction: (input) => recordExternalAction(db, input),
+    recordTransfer: (input) => recordTransfer(db, input),
+    recordValuationMark: (input) => recordValuationMark(db, input),
+    replaceValuationMark: (input) => replaceValuationMark(db, input),
+    getInvestmentHistory: (householdId, investmentId) => getInvestmentHistory(db, householdId, investmentId),
+  };
 }

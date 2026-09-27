@@ -1,4 +1,6 @@
 export type ActionKind = "contribution" | "withdrawal" | "transfer";
+export type ActionId = string;
+export type ValuationMarkId = string;
 export type Provenance = { source?: "manual" | "import" | "system"; sourceReference?: string; notes?: string };
 export type EconomicAction = {
   id: string; householdId: string; kind: ActionKind; effectiveDate: string; amount: string;
@@ -40,4 +42,16 @@ export function formatCents(cents: bigint): string {
 
 export function netValue(grossValue: string, debt: string): string {
   return formatCents(parseCents(grossValue, true) - parseCents(debt, true));
+}
+
+/** A transfer cancels when both linked investments are in the selected boundary. */
+export function netMovementCents(
+  movements: ReadonlyArray<Pick<Movement, "investmentId" | "direction" | "amount">>,
+  includedInvestmentIds: ReadonlySet<string>,
+): bigint {
+  return movements.reduce((total, movement) => {
+    if (!includedInvestmentIds.has(movement.investmentId)) return total;
+    const amount = parseCents(movement.amount);
+    return total + (movement.direction === "in" ? amount : -amount);
+  }, 0n);
 }

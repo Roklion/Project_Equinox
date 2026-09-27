@@ -3,10 +3,11 @@ import { eq, sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createPortfolioService } from "@/application/portfolio";
 import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
-import { createInvestment, closeInvestment, recordExternalAction, recordTransfer, recordValuationMark } from "@/persistence/records";
+import { createInvestment, closeInvestment, createPostgresPortfolioRepository, recordExternalAction, recordTransfer, recordValuationMark } from "@/persistence/records";
 import { actions, assetClasses, households, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
@@ -90,6 +91,14 @@ describe("PostgreSQL persistence", () => {
     await closeInvestment(db, home.id, investment.id, "2026-01-03");
     expect(await db.select().from(actions)).toHaveLength(1);
     expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, investment.id))).toHaveLength(1);
+    const history = await createPortfolioService(createPostgresPortfolioRepository(db))
+      .getInvestmentHistory(home.id, investment.id);
+    expect(history.movements).toEqual([expect.objectContaining({
+      kind: "contribution", effectiveDate: "2026-01-02", direction: "in", amount: "10.25",
+    })]);
+    expect(history.marks).toEqual([expect.objectContaining({
+      asOfDate: "2026-01-02", grossValue: "12.00", debt: "0.00", netValue: "12.00",
+    })]);
     await expect(recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
       kind: "contribution", effectiveDate: "2026-01-04", amount: "1.00" })).rejects.toThrow();
   });
@@ -128,5 +137,28 @@ describe("PostgreSQL persistence", () => {
     await expect(recordValuationMark(db, { householdId: home.id, investmentId: source.id,
       asOfDate: "2026-02-04", grossValue: "101.00" })).rejects.toThrow();
     expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, source.id))).toHaveLength(1);
+  });
+
+  it("corrects one historical mark in place through the application boundary", async () => {
+    const { db } = connection!;
+    const service = createPortfolioService(createPostgresPortfolioRepository(db));
+    const [home] = await db.insert(households).values({ name: "Correction sample" }).returning();
+    const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
+    const investment = await service.createInvestment({ householdId: home.id, name: "Sample holding", ownerIds: [owner.id] });
+    const original = await service.recordValuationMark({ householdId: home.id, investmentId: investment.id,
+      asOfDate: "2026-04-01", grossValue: "100.00", source: "manual", sourceReference: "synthetic-ref" });
+    await service.closeInvestment(home.id, investment.id, "2026-04-02");
+    const replacement = await service.replaceValuationMark({ householdId: home.id, investmentId: investment.id,
+      asOfDate: "2026-04-01", debt: "125.00" });
+    expect(replacement.id).toBe(original.id);
+    const history = await service.getInvestmentHistory(home.id, investment.id);
+    expect(history.marks).toEqual([expect.objectContaining({ id: original.id, asOfDate: "2026-04-01",
+      grossValue: "100.00", debt: "125.00", netValue: "-25.00",
+      source: "manual", sourceReference: "synthetic-ref" })]);
+    expect(history.movements).toEqual([]);
+    await expect(service.recordValuationMark({ householdId: home.id, investmentId: investment.id,
+      asOfDate: "2026-04-01", grossValue: "1.00" })).rejects.toThrow();
+    await expect(service.replaceValuationMark({ householdId: home.id, investmentId: investment.id,
+      asOfDate: "2026-04-02", grossValue: "1.00" })).rejects.toThrow();
   });
 });

@@ -39,7 +39,7 @@ The initial scaffold uses these homes:
 | Framework-independent types and financial rules | `src/domain` |
 | Database access, transactions, and migrations | `src/persistence` |
 
-Dependency direction is presentation → application → domain. Persistence is an adapter used by application workflows. Domain code must not depend on Next.js, React, or persistence. ESLint guards imports from the initial higher-level folders; it is a lightweight guardrail, not a substitute for keeping future dependencies within these boundaries. Application workflows remain future work; persistence now provides a PostgreSQL connection factory and migration runner without domain tables.
+Dependency direction is presentation → application → domain. Persistence implements application-owned repository ports; the application service does not import the PostgreSQL adapter. Domain code does not depend on Next.js, React, or persistence. ESLint guards imports from higher-level folders. The EPIC 1 application service provides only creation, lifecycle, recording, explicit valuation correction, and history queries; full user-facing workflows remain later work.
 
 Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. Deployment topology remains open.
 
@@ -74,11 +74,11 @@ Database integration tests require a separate `TEST_DATABASE_URL` with permissio
 - Enforce required as-of dates for valuation marks.
 - Preserve closed-investment history.
 - Keep derived metrics reproducible from canonical actions and marks rather than storing hand-edited aggregate results.
-- No audit-log or change-history subsystem is required in EPIC 1. Correction behavior is a later workflow decision; preserving closed-investment history remains required.
+- No audit-log or change-history subsystem is required in EPIC 1. Explicit in-place correction of an existing valuation mark is supported; user-facing edit/delete policy remains a later workflow decision. Preserving closed-investment history remains required.
 
 Household IDs scope owner, investment, classification, action, movement, and valuation relationships; composite foreign keys reject cross-household links. Investments have one or more owners, with joint ownership represented by links rather than percentages. Classification IDs remain stable when labels change. Closing an investment requires a calendar date and preserves its rows; new ordinary activity is rejected after closure.
 
-Actions represent contributions, withdrawals, and transfers. A contribution or withdrawal has one investment movement; a transfer has one source outflow and one distinct destination inflow of the same amount. A deferred constraint trigger verifies the complete shape at commit, while `src/persistence/records.ts` writes each logical action and its movements in one transaction. Valuation marks live in a separate table and have one row per investment and as-of date. Gross value and debt are nonnegative; net value is derived and may be negative. See [the data model](data-model.md) for economic meanings and the unresolved correction policy.
+Actions represent contributions, withdrawals, and transfers. A contribution or withdrawal has one investment movement; a transfer has one source outflow and one distinct destination inflow of the same amount. A deferred constraint trigger verifies the complete shape at commit, while `src/persistence/records.ts` writes each logical action and its movements in one transaction. Valuation marks live in a separate table and have one row per investment and as-of date. Gross value and debt are nonnegative; net value is derived and may be negative. `src/application/portfolio.ts` validates exact money and calendar dates through domain functions before calling its repository port. See [the data model](data-model.md) for economic meanings and explicit mark correction.
 
 PostgreSQL transactions should protect related writes such as transfer legs. Database constraints should enforce structural invariants where practical, while domain services own rules that depend on reporting boundaries or historical context.
 
@@ -113,7 +113,7 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 - authentication and intended deployment model;
 - calculated/display rounding;
 - valuation alignment across calendar dates;
-- action correction and deletion semantics (an audit subsystem is outside EPIC 1);
+- user-facing action correction and deletion semantics (an audit subsystem is outside EPIC 1);
 - offline and client-cache boundaries;
 - PostgreSQL hosting, backup, and recovery; and
 - whether and when imports justify a separate Python service.
