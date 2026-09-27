@@ -49,7 +49,7 @@ On desktop, charts support hover and precise pointer inspection. On iPhone, they
 
 ## Responsive behavior
 
-Desktop can use side-by-side summaries, charts, filters, and tables when width supports them. Mobile should prioritize the headline value and primary action, stack supporting content, use compact drill-down surfaces, and keep important controls within comfortable touch reach. Responsive design may change composition and interaction while preserving the same underlying meaning.
+Desktop can use side-by-side summaries, charts, filters, and tables when width supports them. Mobile should prioritize the headline value and primary action, stack supporting content, use compact drill-down surfaces, and keep important controls within comfortable touch reach. Responsive design may change composition and interaction while preserving the same underlying meaning. The installed iPhone shell respects display safe areas, including the bottom home indicator.
 
 ## Input workflows
 
@@ -68,4 +68,4 @@ Likely reusable components include value summaries, metric cards, as-of labels, 
 - exact desktop breakpoints and mobile navigation behavior;
 - chart behavior for sparse or irregular valuation marks;
 - density and interaction model for large investment lists; and
-- offline, install, and update prompts for the PWA.
+- install and update prompts for the PWA; offline financial-data behavior requires a separate security and product decision.

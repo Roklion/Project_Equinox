@@ -82,7 +82,7 @@ PostgreSQL transactions should protect related writes such as transfer legs. Dat
 
 ## PWA and responsive delivery
 
-The application should provide installable metadata and a responsive shell. Offline behavior is not yet specified. Financial data must not be cached for offline use until storage, encryption, session, staleness, and device-loss behavior are explicitly designed.
+The application provides installable metadata and a responsive shell. The EPIC 1 installed experience is online-only: it uses the App Router manifest and home-screen metadata without a service worker, offline record storage, or background mutation sync. Financial API responses, database-derived portfolio data, and authenticated financial pages must not be deliberately cached for offline use. Offline behavior requires a separate decision on storage, encryption, sessions, staleness, and device loss.
 
 Desktop and mobile should share domain and presentation primitives while composing them for pointer, keyboard, and touch interaction as described in [the design system](design-system.md).
 
