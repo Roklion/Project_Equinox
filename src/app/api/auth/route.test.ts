@@ -1,0 +1,174 @@
+import { randomBytes, scryptSync } from "node:crypto";
+import { NextRequest } from "next/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST as login } from "./login/route";
+import { POST as logout } from "./logout/route";
+import { SESSION_COOKIE } from "@/auth/session";
+import { reserveLoginAttempt } from "@/auth/rate-limit";
+import { revokeSession } from "@/auth/store";
+import { proxy } from "@/proxy";
+
+const activeTokens = vi.hoisted(() => new Set<string>());
+const bucketSpy = vi.hoisted(() => vi.fn(() => "synthetic-bucket"));
+vi.mock("@/auth/rate-limit", () => ({
+  loginBucket: bucketSpy,
+  reserveLoginAttempt: vi.fn(async () => true),
+  clearLoginFailures: vi.fn(async () => {}),
+}));
+vi.mock("@/auth/store", () => ({
+  saveSession: vi.fn(async (token: string) => { activeTokens.add(token); }),
+  isSessionActive: vi.fn(async (token: string) => activeTokens.has(token)),
+  revokeSession: vi.fn(async (token: string) => { activeTokens.delete(token); }),
+}));
+
+const originalHash = process.env.APP_PASSWORD_HASH;
+const originalSecret = process.env.SESSION_SECRET;
+const secret = "ab".repeat(32);
+
+beforeEach(() => {
+  activeTokens.clear();
+  vi.mocked(revokeSession).mockImplementation(async (token) => { activeTokens.delete(token); });
+  const salt = randomBytes(16);
+  const hash = scryptSync("synthetic-password", salt, 32, { N: 16384, r: 8, p: 1 });
+  process.env.APP_PASSWORD_HASH = `scrypt$16384$8$1$${salt.toString("hex")}$${hash.toString("hex")}`;
+  process.env.SESSION_SECRET = secret;
+});
+afterEach(() => {
+  process.env.APP_PASSWORD_HASH = originalHash;
+  process.env.SESSION_SECRET = originalSecret;
+  vi.restoreAllMocks();
+});
+
+function loginRequest(password: string) {
+  return new NextRequest("http://localhost:3000/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+    body: JSON.stringify({ password }),
+  });
+}
+
+describe("login and logout", () => {
+  it("rejects cross-site form posts before reserving a login attempt", async () => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const crossSiteForm = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://attacker.example" },
+      body: "password=synthetic-password",
+    });
+
+    const response = await login(crossSiteForm);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed JSON without logging it as an operational error", async () => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const malformedRequest = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: "{",
+    });
+
+    const response = await login(malformedRequest);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).toHaveBeenCalledOnce();
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("uses only the trusted platform IP header for the throttle bucket", async () => {
+    const spoofedOnly = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": "198.51.100.44" },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    await login(spoofedOnly);
+    expect(bucketSpy).toHaveBeenLastCalledWith("unknown", secret);
+
+    const platformAddress = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+        "x-real-ip": "203.0.113.16",
+        "x-forwarded-for": "198.51.100.44",
+      },
+      body: JSON.stringify({ password: "wrong-password" }),
+    });
+    await login(platformAddress);
+    expect(bucketSpy).toHaveBeenLastCalledWith("203.0.113.16", secret);
+  });
+
+  it("rejects an incorrect password without setting a session", async () => {
+    const response = await login(loginRequest("wrong-password"));
+    expect(response.status).toBe(401);
+    expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
+  });
+
+  it("fails generically and logs when authentication configuration is missing", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    delete process.env.SESSION_SECRET;
+    const response = await login(loginRequest("synthetic-password"));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(log).toHaveBeenCalledWith("Authentication configuration is missing or invalid.");
+  });
+
+  it.each(["APP_PASSWORD_HASH", "SESSION_SECRET"] as const)("fails closed when %s has an invalid format", async (name) => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    if (name === "APP_PASSWORD_HASH") process.env.APP_PASSWORD_HASH = "copied-prompt-scrypt$hash";
+    else process.env.SESSION_SECRET = "not-a-hex-signing-key";
+
+    const response = await login(loginRequest("synthetic-password"));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("Authentication configuration is missing or invalid.");
+  });
+
+  it("fails generically and logs a fixed diagnostic when login infrastructure fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(reserveLoginAttempt).mockRejectedValueOnce(new Error("synthetic database failure"));
+    const response = await login(loginRequest("synthetic-password"));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(log).toHaveBeenCalledWith("Login failed due to an unexpected error.");
+  });
+
+  it("grants access with a correct password and revokes the token on logout", async () => {
+    const response = await login(loginRequest("synthetic-password"));
+    expect(response.status).toBe(200);
+    const cookie = response.cookies.get(SESSION_COOKIE);
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.sameSite).toBe("lax");
+    expect(cookie?.maxAge).toBe(7 * 24 * 60 * 60);
+    const protectedRequest = new NextRequest("http://localhost:3000/", {
+      headers: { cookie: `${SESSION_COOKIE}=${cookie?.value}` },
+    });
+    expect((await proxy(protectedRequest)).status).toBe(200);
+    const signedOut = await logout(protectedRequest);
+    expect(signedOut.cookies.get(SESSION_COOKIE)?.maxAge).toBe(0);
+    expect((await proxy(protectedRequest)).status).toBe(307);
+  });
+
+  it("preserves the token and reports incomplete revocation on database failure", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(revokeSession).mockRejectedValueOnce(new Error("postgres://synthetic-secret@localhost"));
+    const token = "synthetic-session-token";
+    const request = new NextRequest("http://localhost:3000/api/auth/logout", {
+      method: "POST",
+      headers: { cookie: SESSION_COOKIE + "=" + token },
+    });
+    const response = await logout(request);
+    expect(response.status).toBe(503);
+    expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(log).toHaveBeenCalledWith("Session revocation failed during logout.");
+  });
+});

@@ -1,13 +1,13 @@
 # Hosted deployment
 
-This is the operational path for Vercel Hobby and Neon Free. The application uses standard PostgreSQL through `pg` and Drizzle. The current app is an empty shell; it has no investment storage workflow or authentication yet. Do not enter real financial data until [Issue #17](https://github.com/Roklion/Project_Equinox/issues/17) protects the production URL.
+This is the operational path for Vercel Hobby and Neon Free. The application uses standard PostgreSQL through `pg` and Drizzle. Single-password authentication is implemented, but the production URL is protected only after migrations are applied and the required environment variables are configured. Complete the [authentication setup](../README.md#authentication) and verify hosted sign-in before entering real financial data.
 
 ## Configure Neon and Vercel
 
 1. Create a Neon Free project and identify its production branch and database. Obtain a PostgreSQL connection URL with TLS enabled. Keep the URL private; do not paste its password, hostname, or full value into a GitHub issue, commit, screenshot, or log.
 2. Import this repository into Vercel Hobby and select `main` as the production branch. Use the normal Next.js build settings (`npm ci` and `npm run build`); the build does not contact PostgreSQL or require seeded data.
 3. In Vercel Project Settings → Environment Variables, set `DATABASE_URL` for Production only. Do not use a `NEXT_PUBLIC_` prefix. Add Preview or Development access only when a separate safe database and a concrete workflow require it. Avoid connecting previews to production data.
-4. Issue #17 owns `APP_PASSWORD_HASH` and `SESSION_SECRET` (or its final chosen names). Generate them using that ticket's documented process and configure them privately once the implementation exists. Never invent placeholder production secrets. Before then, the public empty shell contains no personal data.
+4. Generate `APP_PASSWORD_HASH` and `SESSION_SECRET` as described in [authentication setup](../README.md#authentication), then set them privately in Vercel Project Settings → Environment Variables. Never invent placeholder production secrets or commit generated values.
 
 For local development, copy `.env.example` to ignored `.env.local` and use the Docker PostgreSQL URL described in [local setup](../README.md#local-postgresql). To run an explicit hosted operation from a trusted workstation, temporarily set `DATABASE_URL` to the hosted URL in ignored local configuration or the process environment. Check the target in the Neon console before running migration or verification commands. Never use `npm run db:reset` against a hosted database.
 

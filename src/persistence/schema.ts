@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, date, foreignKey, index, numeric, pgTable, primaryKey, text, unique, uuid } from "drizzle-orm/pg-core";
+import { char, check, date, foreignKey, index, integer, numeric, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 const id = (name: string) => uuid(name).defaultRandom().notNull();
 const money = (name: string) => numeric(name, { precision: 18, scale: 2 }).notNull();
@@ -108,3 +108,13 @@ export const valuationMarks = pgTable("valuation_marks", {
   check("valuation_marks_nonnegative_values", sql`${t.grossValue} >= 0 and ${t.debt} >= 0`),
   check("valuation_marks_source", sql`${t.source} is null or ${t.source} in ('manual', 'import', 'system')`),
 ]);
+// Operational authentication state is separate from the financial domain model.
+export const authLoginAttempts = pgTable("auth_login_attempts", {
+  bucket: char("bucket", { length: 64 }).primaryKey(),
+  failures: integer("failures").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+});
+export const authSessions = pgTable("auth_sessions", {
+  tokenHash: char("token_hash", { length: 64 }).primaryKey(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});

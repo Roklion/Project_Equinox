@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: equinox
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: equinox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U equinox -d equinox"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://equinox:ci-only-password@localhost:5432/equinox
+      TEST_DATABASE_URL: postgresql://equinox:ci-only-password@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run test:db
+      - run: npm run build
+      - name: Check whitespace
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: git diff --check "$BASE_SHA" "$GITHUB_SHA"
