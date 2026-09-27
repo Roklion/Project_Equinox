@@ -41,7 +41,7 @@ The initial scaffold uses these homes:
 
 Dependency direction is presentation → application → domain. Persistence implements application-owned repository ports; the application service does not import the PostgreSQL adapter. Domain code does not depend on Next.js, React, or persistence. ESLint guards imports from higher-level folders. The EPIC 1 application service provides only creation, lifecycle, recording, explicit valuation correction, and history queries; full user-facing workflows remain later work.
 
-Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. Deployment topology remains open.
+Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. The hosted topology uses Vercel for Next.js and Neon Free for PostgreSQL; [hosted deployment](hosted-deployment.md) owns operational instructions.
 
 The scaffold uses Next.js 16.3.6 and React 19.3. ESLint stays on 9 and TypeScript on 6.0 because the current Next.js lint plugins do not support ESLint 10 or TypeScript 7. Revisit these compatible tooling versions when the upstream plugins support newer majors.
 
@@ -60,6 +60,8 @@ Use Drizzle ORM with the standard `pg` (node-postgres) driver. `src/persistence/
 `src/persistence/schema.ts` owns the domain tables. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The initial custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. The next migration introduces canonical economic records and deferred PostgreSQL checks for required owners and complete action legs.
 
 `npm run db:migrate` and integration tests share `src/persistence/migrate.ts`, which delegates migration tracking and transactions to Drizzle. Run migrations as an explicit deployment step; do not run them on page requests or use schema push in production/shared environments. Already-applied migrations are immutable: make corrections in a new migration. No schema-push script is provided.
+
+`npm run db:verify` reuses the same server-only database adapter and performs a synthetic insert and select in a session-local temporary table that PostgreSQL drops at commit. It is an operational connectivity check, not an application investment workflow or a demo seed. No domain tables exist yet. Neon configuration in `neon.ts` is limited to branch policy; application SQL, migration files, and the driver use standard PostgreSQL interfaces.
 
 Docker Compose provides standard PostgreSQL 18.4, bound to loopback port 5433 with a Docker-managed named volume. No database files belong in the repository. An existing standard PostgreSQL service can use the same adapter and migration commands through `DATABASE_URL`. See [database setup](../README.md#local-postgresql) for startup and destructive local rebuild commands.
 
@@ -84,7 +86,7 @@ PostgreSQL transactions should protect related writes such as transfer legs. Dat
 
 ## PWA and responsive delivery
 
-The application should provide installable metadata and a responsive shell. Offline behavior is not yet specified. Financial data must not be cached for offline use until storage, encryption, session, staleness, and device-loss behavior are explicitly designed.
+The application provides installable metadata and a responsive shell. The EPIC 1 installed experience is online-only: it uses the App Router manifest and home-screen metadata without a service worker, offline record storage, or background mutation sync. Financial API responses, database-derived portfolio data, and authenticated financial pages must not be deliberately cached for offline use. Offline behavior requires a separate decision on storage, encryption, sessions, staleness, and device loss.
 
 Desktop and mobile should share domain and presentation primitives while composing them for pointer, keyboard, and touch interaction as described in [the design system](design-system.md).
 
@@ -110,12 +112,12 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 
 ## Decisions required before implementation
 
-- authentication and intended deployment model;
-- calculated/display rounding;
+- authentication implementation and production secret handling (tracked in [Issue #17](https://github.com/Roklion/Project_Equinox/issues/17));
+- monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
 - user-facing action correction and deletion semantics (an audit subsystem is outside EPIC 1);
 - offline and client-cache boundaries;
-- PostgreSQL hosting, backup, and recovery; and
+- PostgreSQL backup and recovery; and
 - whether and when imports justify a separate Python service.
 
 Multi-currency support and foreign exchange are outside the USD-only MVP.
