@@ -42,6 +42,7 @@ a:focus-visible {
 .app-shell {
   max-width: 76rem;
   margin-inline: auto;
+  padding-inline: clamp(var(--space-3), 5vw, var(--space-6));
   padding-inline: max(clamp(var(--space-3), 5vw, var(--space-6)), env(safe-area-inset-left))
     max(clamp(var(--space-3), 5vw, var(--space-6)), env(safe-area-inset-right));
   padding-top: env(safe-area-inset-top);
