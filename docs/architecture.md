@@ -57,7 +57,7 @@ Never import secrets into domain or client components. The database adapter is m
 
 Use Drizzle ORM with the standard `pg` (node-postgres) driver. `src/persistence/database.ts` creates a small connection pool and a typed Drizzle database; the caller owns pool reuse and shutdown. Connections are lazy, so importing the adapter does not contact a database. The migration CLI reports the underlying error message and code when available; invalid connection URL errors omit the supplied value. The idle-pool handler logs a generic message rather than the driver error. The adapter passes the connection URL's TLS options to `pg` without overriding certificate verification. Hosted-provider SDKs are not required.
 
-`src/persistence/schema.ts` is the future domain-schema owner. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The initial custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. Subsequent schema tickets generate real DDL from the schema owner.
+`src/persistence/schema.ts` owns the domain tables. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The initial custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. The next migration introduces canonical economic records and deferred PostgreSQL checks for required owners and complete action legs.
 
 `npm run db:migrate` and integration tests share `src/persistence/migrate.ts`, which delegates migration tracking and transactions to Drizzle. Run migrations as an explicit deployment step; do not run them on page requests or use schema push in production/shared environments. Already-applied migrations are immutable: make corrections in a new migration. No schema-push script is provided.
 
@@ -67,7 +67,7 @@ Database integration tests require a separate `TEST_DATABASE_URL` with permissio
 
 ## Data integrity
 
-- MVP financial currency is USD only. Persist monetary values with exact cent precision, using PostgreSQL exact numeric or integer-cent types rather than binary floating point. Choose column capacity with the domain schema; retain exact strings or integer cents at the driver boundary.
+- MVP financial currency is USD only. Persist monetary values as `numeric(18, 2)` and retain exact strings or integer cents at the driver boundary. The recording adapter rejects more than two fractional digits rather than rounding them.
 - Financial/economic dates are calendar dates with daily granularity (`date`), represented as date-only values rather than instants. Operational metadata may use UTC `timestamptz`; it must never determine a financial effective date.
 - Give investments and actions stable identifiers.
 - Represent a transfer as one logical operation whose paired movements are written atomically.
@@ -75,6 +75,10 @@ Database integration tests require a separate `TEST_DATABASE_URL` with permissio
 - Preserve closed-investment history.
 - Keep derived metrics reproducible from canonical actions and marks rather than storing hand-edited aggregate results.
 - No audit-log or change-history subsystem is required in EPIC 1. Correction behavior is a later workflow decision; preserving closed-investment history remains required.
+
+Household IDs scope owner, investment, classification, action, movement, and valuation relationships; composite foreign keys reject cross-household links. Investments have one or more owners, with joint ownership represented by links rather than percentages. Classification IDs remain stable when labels change. Closing an investment requires a calendar date and preserves its rows; new ordinary activity is rejected after closure.
+
+Actions represent contributions, withdrawals, and transfers. A contribution or withdrawal has one investment movement; a transfer has one source outflow and one distinct destination inflow of the same amount. A deferred constraint trigger verifies the complete shape at commit, while `src/persistence/records.ts` writes each logical action and its movements in one transaction. Valuation marks live in a separate table and have one row per investment and as-of date. Gross value and debt are nonnegative; net value is derived and may be negative. See [the data model](data-model.md) for economic meanings and the unresolved correction policy.
 
 PostgreSQL transactions should protect related writes such as transfer legs. Database constraints should enforce structural invariants where practical, while domain services own rules that depend on reporting boundaries or historical context.
 
@@ -107,10 +111,9 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 ## Decisions required before implementation
 
 - authentication and intended deployment model;
-- monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
+- calculated/display rounding;
 - valuation alignment across calendar dates;
 - action correction and deletion semantics (an audit subsystem is outside EPIC 1);
-- duplicate valuation-mark handling;
 - offline and client-cache boundaries;
 - PostgreSQL hosting, backup, and recovery; and
 - whether and when imports justify a separate Python service.

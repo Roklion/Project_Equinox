@@ -57,7 +57,7 @@ Every valuation mark has an as-of date and identifies its investment. A mark rec
 
 Debt may exceed gross value; negative net investment value is valid. A mark is an observation, not a cash flow.
 
-The policy for multiple marks on the same investment and as-of date remains unresolved. The implementation must choose and document either replacement/versioning or an explicit ordering rule before accepting such records.
+The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. Correction/replacement behavior is deferred until the editing workflow is designed; no silent overwrite occurs.
 
 ## Lifecycle
 
@@ -79,4 +79,4 @@ An investment can be active or closed. Closing stops ordinary forward data entry
 
 MVP financial values are USD with exact cent precision. Financial/economic dates are daily calendar dates, not timestamps. Operational metadata may use UTC timestamps but cannot supply or replace an economic effective date. Storage and adapter conventions are owned by [architecture](architecture.md#data-integrity).
 
-Column capacity, handling of input beyond cent precision, calculated/display rounding, valuation selection between marks, and correction/deletion behavior remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.
+Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The recording adapter accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Valuation selection between dates, calculated/display rounding, and correction/deletion behavior remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.

@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
+import { createInvestment, closeInvestment, recordExternalAction, recordTransfer, recordValuationMark } from "@/persistence/records";
+import { actions, assetClasses, households, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
 vi.mock("server-only", () => ({}));
@@ -51,5 +53,80 @@ describe("PostgreSQL persistence", () => {
     await migrateDatabase(db);
     const second = await db.execute(sql`select hash, created_at from drizzle.__drizzle_migrations order by id`);
     expect(second.rows).toEqual(first.rows);
+  });
+
+  it("keeps ownership and classification within a household, including after closure", async () => {
+    const { db } = connection!;
+    const [home, other] = await db.insert(households).values([
+      { name: "Sample household" }, { name: "Other sample household" },
+    ]).returning();
+    const [first, second, outsider] = await db.insert(owners).values([
+      { householdId: home.id, name: "Owner A" },
+      { householdId: home.id, name: "Owner B" },
+      { householdId: other.id, name: "Owner C" },
+    ]).returning();
+    const [assetClass] = await db.insert(assetClasses).values({ householdId: home.id, label: "Other asset" }).returning();
+    const [otherClass] = await db.insert(assetClasses).values({ householdId: other.id, label: "Other category" }).returning();
+    const investment = await createInvestment(db, {
+      householdId: home.id, name: "Sample investment", ownerIds: [first.id, second.id], assetClassId: assetClass.id,
+    });
+    expect(await db.select().from(investmentOwners).where(eq(investmentOwners.investmentId, investment.id))).toHaveLength(2);
+    await db.update(assetClasses).set({ label: "Renamed asset" }).where(eq(assetClasses.id, assetClass.id));
+    const [unchanged] = await db.select().from(investments).where(eq(investments.id, investment.id));
+    expect(unchanged.assetClassId).toBe(assetClass.id);
+    await expect(createInvestment(db, {
+      householdId: home.id, name: "Invalid owner", ownerIds: [outsider.id],
+    })).rejects.toThrow();
+    await expect(createInvestment(db, {
+      householdId: home.id, name: "Invalid classification", ownerIds: [first.id], assetClassId: otherClass.id,
+    })).rejects.toThrow();
+    await expect(db.insert(investments).values({ householdId: home.id, name: "Ownerless" })).rejects.toThrow();
+
+    await recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
+      kind: "contribution", effectiveDate: "2026-01-02", amount: "10.25" });
+    await recordValuationMark(db, { householdId: home.id, investmentId: investment.id,
+      asOfDate: "2026-01-02", grossValue: "12.00" });
+    await expect(closeInvestment(db, home.id, investment.id, "2026-01-01")).rejects.toThrow();
+    await closeInvestment(db, home.id, investment.id, "2026-01-03");
+    expect(await db.select().from(actions)).toHaveLength(1);
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, investment.id))).toHaveLength(1);
+    await expect(recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
+      kind: "contribution", effectiveDate: "2026-01-04", amount: "1.00" })).rejects.toThrow();
+  });
+
+  it("writes complete transfer legs atomically and keeps marks separate", async () => {
+    const { db } = connection!;
+    const [home] = await db.insert(households).values({ name: "Transfer sample" }).returning();
+    const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
+    const source = await createInvestment(db, { householdId: home.id, name: "Source", ownerIds: [owner.id] });
+    const destination = await createInvestment(db, { householdId: home.id, name: "Destination", ownerIds: [owner.id] });
+    const transfer = await recordTransfer(db, { householdId: home.id, sourceInvestmentId: source.id,
+      destinationInvestmentId: destination.id, effectiveDate: "2026-02-03", amount: "125.25" });
+    expect(await db.select({ role: movements.role, direction: movements.direction, amount: movements.amount })
+      .from(movements).where(eq(movements.actionId, transfer.id))).toEqual([
+      { role: "source", direction: "out", amount: "125.25" },
+      { role: "destination", direction: "in", amount: "125.25" },
+    ]);
+    await expect(recordTransfer(db, { householdId: home.id, sourceInvestmentId: source.id,
+      destinationInvestmentId: source.id, effectiveDate: "2026-02-04", amount: "1.00" })).rejects.toThrow();
+    const beforeMalformed = await db.select({ id: actions.id }).from(actions).where(eq(actions.householdId, home.id));
+    await expect(db.transaction(async (tx) => {
+      const [partial] = await tx.insert(actions).values({ householdId: home.id, kind: "transfer",
+        effectiveDate: "2026-02-04", amount: "2.00" }).returning();
+      await tx.insert(movements).values({ householdId: home.id, actionId: partial.id,
+        investmentId: source.id, role: "source", direction: "out", amount: "2.00" });
+    })).rejects.toThrow();
+    expect(await db.select({ id: actions.id }).from(actions).where(eq(actions.householdId, home.id)))
+      .toEqual(beforeMalformed);
+    await expect(db.insert(actions).values({ householdId: home.id, kind: "transfer",
+      effectiveDate: "2026-02-04", amount: "2.00" })).rejects.toThrow();
+
+    const mark = await recordValuationMark(db, { householdId: home.id, investmentId: source.id,
+      asOfDate: "2026-02-04", grossValue: "100.00", debt: "125.25" });
+    expect(mark.grossValue).toBe("100.00");
+    expect(await db.select().from(actions).where(eq(actions.id, transfer.id))).toHaveLength(1);
+    await expect(recordValuationMark(db, { householdId: home.id, investmentId: source.id,
+      asOfDate: "2026-02-04", grossValue: "101.00" })).rejects.toThrow();
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, source.id))).toHaveLength(1);
   });
 });
