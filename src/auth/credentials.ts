@@ -1,16 +1,19 @@
 import { scrypt, timingSafeEqual } from "node:crypto";
 
 const DUMMY_HASH = "scrypt$16384$8$1$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000";
+const PASSWORD_HASH_PATTERN = /^scrypt\$16384\$8\$1\$([a-f0-9]{32})\$([a-f0-9]{64})$/;
+
+export function isValidPasswordHash(storedHash: string | undefined): storedHash is string {
+  return typeof storedHash === "string" && PASSWORD_HASH_PATTERN.test(storedHash);
+}
 
 export async function verifyPassword(password: string, storedHash: string | undefined): Promise<boolean> {
-  const parts = (storedHash ?? DUMMY_HASH).split("$");
-  if (parts.length !== 6 || parts[0] !== "scrypt") return false;
-  const [cost, blockSize, parallelization] = parts.slice(1, 4).map(Number);
-  const salt = parts[4];
-  const expected = Buffer.from(parts[5], "hex");
-  if (cost !== 16384 || blockSize !== 8 || parallelization !== 1 || !/^[a-f0-9]{32}$/.test(salt) || expected.length !== 32) return false;
+  const match = PASSWORD_HASH_PATTERN.exec(storedHash ?? DUMMY_HASH);
+  if (!match) return false;
+  const salt = Buffer.from(match[1], "hex");
+  const expected = Buffer.from(match[2], "hex");
   const actual = await new Promise<Buffer>((resolve, reject) => {
-    scrypt(password, Buffer.from(salt, "hex"), 32, { N: cost, r: blockSize, p: parallelization }, (error, derived) => {
+    scrypt(password, salt, 32, { N: 16384, r: 8, p: 1 }, (error, derived) => {
       if (error) reject(error);
       else resolve(derived);
     });

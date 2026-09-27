@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createSession, hasValidSession, SESSION_SECONDS } from "./session";
+import { createSession, hasValidSession, isValidSessionSecret, SESSION_SECONDS } from "./session";
 
 const secret = "ab".repeat(32);
 
 describe("signed session", () => {
+  it("recognizes hex signing secrets supported by the session format", () => {
+    expect(isValidSessionSecret(secret)).toBe(true);
+    expect(isValidSessionSecret("not-hex")).toBe(false);
+    expect(isValidSessionSecret("ab".repeat(31))).toBe(false);
+  });
+
   it("accepts a valid session until its seven-day expiry", () => {
     const now = Date.UTC(2026, 0, 1);
     const token = createSession(secret, now);

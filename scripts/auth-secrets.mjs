@@ -14,7 +14,7 @@ if (command === "secret") {
   } else {
     const input = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
     input._writeToOutput = function (text) {
-      if (text.startsWith("Password: ") || text === "\n") process.stdout.write(text);
+      if (text.startsWith("Password: ") || text === "\n" || text === "\r\n") process.stdout.write(text);
     };
     const password = await new Promise((resolve) => input.question("Password: ", resolve));
     input.close();

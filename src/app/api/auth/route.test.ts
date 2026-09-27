@@ -115,8 +115,23 @@ describe("login and logout", () => {
     const response = await login(loginRequest("synthetic-password"));
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unable to sign in." });
-    expect(log).toHaveBeenCalledWith("Authentication configuration is missing (SESSION_SECRET or APP_PASSWORD_HASH).");
+    expect(log).toHaveBeenCalledWith("Authentication configuration is missing or invalid.");
   });
+
+  it.each(["APP_PASSWORD_HASH", "SESSION_SECRET"] as const)("fails closed when %s has an invalid format", async (name) => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    if (name === "APP_PASSWORD_HASH") process.env.APP_PASSWORD_HASH = "copied-prompt-scrypt$hash";
+    else process.env.SESSION_SECRET = "not-a-hex-signing-key";
+
+    const response = await login(loginRequest("synthetic-password"));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("Authentication configuration is missing or invalid.");
+  });
+
   it("fails generically and logs a fixed diagnostic when login infrastructure fails", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(reserveLoginAttempt).mockRejectedValueOnce(new Error("synthetic database failure"));

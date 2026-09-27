@@ -8,6 +8,10 @@ function key(secret: string | undefined): Buffer | null {
   return Buffer.from(secret, "hex");
 }
 
+export function isValidSessionSecret(secret: string | undefined): secret is string {
+  return key(secret) !== null;
+}
+
 export function createSession(secret: string, now = Date.now()): string {
   const signingKey = key(secret);
   if (!signingKey) throw new Error("Session configuration is unavailable.");

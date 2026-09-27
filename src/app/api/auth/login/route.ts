@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword } from "@/auth/credentials";
-import { createSession, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
+import { isValidPasswordHash, verifyPassword } from "@/auth/credentials";
+import { createSession, isValidSessionSecret, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
 import { clearLoginFailures, loginBucket, reserveLoginAttempt } from "@/auth/rate-limit";
 import { saveSession } from "@/auth/store";
 
@@ -12,8 +12,8 @@ export async function POST(request: NextRequest) {
 
   const secret = process.env.SESSION_SECRET;
   const hash = process.env.APP_PASSWORD_HASH;
-  if (!secret || !hash) {
-    console.error("Authentication configuration is missing (SESSION_SECRET or APP_PASSWORD_HASH).");
+  if (!isValidSessionSecret(secret) || !isValidPasswordHash(hash)) {
+    console.error("Authentication configuration is missing or invalid.");
     return genericFailure();
   }
 
