@@ -8,10 +8,12 @@
 
 ## Engineering practice
 
+- Equinox is a personal app. Keep changes within the requested scope and proportionate to ordinary personal use. Protect credible financial-data integrity and privacy risks, but do not add speculative concurrency mechanisms, defenses against impractical manipulation, or exhaustive edge-case handling without a concrete supported workflow that needs them. Prefer a small, understandable implementation over infrastructure for hypothetical scale or adversarial use.
 - Inspect the nearest related implementation before adding a workflow or substantial logic. Reuse or extend an existing owner when semantics match; introduce parallel logic only when responsibilities genuinely differ.
 - Avoid mechanical DRY and generic frameworks. Split modules by cohesive responsibility and keep validation and tests proportional to credible product and data-integrity risks.
 - Test domain invariants, supported workflows, and relevant failure paths. Do not optimize for coverage numbers or exhaustive theoretical combinations.
 - Read `docs/design-system.md` before changing UI, navigation, charts, forms, or responsive behavior. Keep shared tokens and components centralized where practical, and update the design document when the interface contract changes.
+- For Next.js APIs and conventions, consult the version-matched documentation in `node_modules/next/dist/docs/` after installing dependencies.
 
 ## Permissions and Git
 

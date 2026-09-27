@@ -83,4 +83,6 @@ Internal transfers cancel when both sides fall inside the reporting boundary. A 
 
 ## Precision and currency
 
-Storage precision, display rounding, base currency, foreign-exchange sources, and FX timing remain unresolved. Until multi-currency behavior is specified, metric labels and examples must not imply that values in different currencies can be safely summed.
+MVP financial inputs and stored monetary values are USD with exact cent precision; binary floating point must not be used to store money. Calculated-metric precision and display rounding remain decisions for the metric implementations. Financial dates are daily calendar dates, independent of operational timestamps. See [architecture](architecture.md#data-integrity) for storage conventions.
+
+Multi-currency support and foreign exchange are outside the MVP. Metric labels and examples must not imply that values in different currencies can be safely summed.

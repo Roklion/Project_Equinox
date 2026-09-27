@@ -1,0 +1,21 @@
+name: equinox-local
+
+services:
+  postgres:
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: equinox
+      POSTGRES_DB: equinox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equinox -d equinox"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  postgres-data:

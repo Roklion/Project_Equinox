@@ -31,6 +31,8 @@ Use semantic design tokens for color, typography, spacing, radii, elevation, and
 
 Color must not carry meaning alone. Positive and negative states need labels, signs, shapes, or patterns as appropriate. Text, controls, focus indicators, and charts should meet WCAG 2.2 AA contrast and interaction expectations.
 
+The initial shell uses a light neutral canvas, white surfaces, dark green text and accents, system sans-serif body text, and a system serif display face. Semantic CSS custom properties in `src/app/globals.css` own its colors, fonts, spacing, radii, and elevation; no external font request is required. This is a starting visual direction, not a complete brand system. The shell stacks its header below 40rem, includes a keyboard skip link and visible link focus, and displays an explicit empty state without invented financial values or nonfunctional action controls. Navigation and investment-entry composition remain future work.
+
 Financial values use tabular numerals where available, an explicit currency, consistent precision within a view, and a real unavailable state such as an em dash. Negative values retain their sign. Every current-value context includes an as-of date.
 
 ## Charts
