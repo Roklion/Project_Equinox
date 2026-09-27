@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as login } from "./login/route";
 import { POST as logout } from "./logout/route";
 import { SESSION_COOKIE } from "@/auth/session";
+import { reserveLoginAttempt } from "@/auth/rate-limit";
 import { revokeSession } from "@/auth/store";
 import { proxy } from "@/proxy";
 
@@ -83,6 +84,15 @@ describe("login and logout", () => {
     expect(await response.json()).toEqual({ error: "Unable to sign in." });
     expect(log).toHaveBeenCalledWith("Authentication configuration is missing (SESSION_SECRET or APP_PASSWORD_HASH).");
   });
+  it("fails generically and logs a fixed diagnostic when login infrastructure fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(reserveLoginAttempt).mockRejectedValueOnce(new Error("synthetic database failure"));
+    const response = await login(loginRequest("synthetic-password"));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(log).toHaveBeenCalledWith("Login failed due to an unexpected error.");
+  });
+
   it("grants access with a correct password and revokes the token on logout", async () => {
     const response = await login(loginRequest("synthetic-password"));
     expect(response.status).toBe(200);

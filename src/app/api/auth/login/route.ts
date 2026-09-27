@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
     return response;
   } catch {
+    console.error("Login failed due to an unexpected error.");
     return genericFailure();
   }
 }

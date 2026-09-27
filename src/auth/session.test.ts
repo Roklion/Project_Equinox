@@ -11,6 +11,16 @@ describe("signed session", () => {
     expect(hasValidSession(token, secret, now + SESSION_SECONDS * 1000)).toBe(false);
   });
 
+  it("accepts hex signing secrets regardless of letter case", () => {
+    const token = createSession(secret);
+    expect(hasValidSession(token, secret.toUpperCase())).toBe(true);
+  });
+
+  it("validates deterministic sessions created with a small timestamp", () => {
+    const token = createSession(secret, 0);
+    expect(hasValidSession(token, secret, 0)).toBe(true);
+  });
+
   it("rejects tampering and an unrelated signing secret", () => {
     const token = createSession(secret);
     expect(hasValidSession(token.replace("v1.", "v2."), secret)).toBe(false);
