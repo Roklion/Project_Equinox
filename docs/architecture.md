@@ -108,13 +108,13 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 
 ## Decisions required before implementation
 
-- authentication and intended deployment model;
+- authentication implementation and production secret handling (tracked in [Issue #17](https://github.com/Roklion/Project_Equinox/issues/17));
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
 - action correction and deletion semantics (an audit subsystem is outside EPIC 1);
 - duplicate valuation-mark handling;
 - offline and client-cache boundaries;
-- PostgreSQL hosting, backup, and recovery; and
+- PostgreSQL backup and recovery; and
 - whether and when imports justify a separate Python service.
 
 Multi-currency support and foreign exchange are outside the USD-only MVP.

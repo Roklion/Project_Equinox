@@ -5,6 +5,25 @@ import { readDatabaseUrl } from "../src/persistence/environment";
 
 nextEnv.loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
 
+const safeDriverCodes = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+]);
+
+function safeDriverCode(error: unknown): string {
+  if (!error || typeof error !== "object" || !("code" in error) || typeof error.code !== "string") {
+    return "";
+  }
+
+  const code = error.code;
+  return /^[A-Z0-9]{5}$/.test(code) || safeDriverCodes.has(code) ? ` [${code}]` : "";
+}
+
 async function main() {
   const { db, pool } = createDatabase(readDatabaseUrl());
   try {
@@ -40,6 +59,6 @@ main().catch((error: unknown) => {
   const message = error instanceof Error && safeMessages.has(error.message)
     ? error.message
     : "Server-side PostgreSQL synthetic read/write check failed.";
-  console.error(message);
+  console.error(`${message}${safeDriverCode(error)}`);
   process.exitCode = 1;
 });
