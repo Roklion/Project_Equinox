@@ -85,22 +85,25 @@ describe("PostgreSQL persistence", () => {
 
     await recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
       kind: "contribution", effectiveDate: "2026-01-02", amount: "10.25" });
+    await recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
+      kind: "withdrawal", effectiveDate: "2026-01-03", amount: "2.00" });
     await recordValuationMark(db, { householdId: home.id, investmentId: investment.id,
       asOfDate: "2026-01-02", grossValue: "12.00" });
     await expect(closeInvestment(db, home.id, investment.id, "2026-01-01")).rejects.toThrow();
-    await closeInvestment(db, home.id, investment.id, "2026-01-03");
-    expect(await db.select().from(actions)).toHaveLength(1);
+    await closeInvestment(db, home.id, investment.id, "2026-01-04");
+    expect(await db.select().from(actions)).toHaveLength(2);
     expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, investment.id))).toHaveLength(1);
     const history = await createPortfolioService(createPostgresPortfolioRepository(db))
       .getInvestmentHistory(home.id, investment.id);
-    expect(history.movements).toEqual([expect.objectContaining({
-      kind: "contribution", effectiveDate: "2026-01-02", direction: "in", amount: "10.25",
-    })]);
+    expect(history.movements).toEqual([
+      expect.objectContaining({ kind: "contribution", effectiveDate: "2026-01-02", direction: "in", amount: "10.25" }),
+      expect.objectContaining({ kind: "withdrawal", effectiveDate: "2026-01-03", direction: "out", amount: "2.00" }),
+    ]);
     expect(history.marks).toEqual([expect.objectContaining({
       asOfDate: "2026-01-02", grossValue: "12.00", debt: "0.00", netValue: "12.00",
     })]);
     await expect(recordExternalAction(db, { householdId: home.id, investmentId: investment.id,
-      kind: "contribution", effectiveDate: "2026-01-04", amount: "1.00" })).rejects.toThrow();
+      kind: "contribution", effectiveDate: "2026-01-05", amount: "1.00" })).rejects.toThrow();
   });
 
   it("writes complete transfer legs atomically and keeps marks separate", async () => {
