@@ -118,7 +118,7 @@ APP_PASSWORD_HASH=scrypt\$16384\$8\$1\$<salt>\$<digest>
 SESSION_SECRET=<locally-generated-hex-secret>
 ```
 
-The app also requires `DATABASE_URL` at login for PostgreSQL-backed failed-attempt throttling. Apply migrations first with `npm run db:migrate`. Five failed attempts from an IP address within 15 minutes trigger a temporary rejection; the database is required for successful login. For production, set the hash, session secret, and database URL only in Vercel environment configuration. Never place the raw password, hash, or signing secret in GitHub, logs, or any `NEXT_PUBLIC_` variable. Configure these secrets and validate the hosted login flow before entering real financial data.
+The app requires `DATABASE_URL` for PostgreSQL-backed failed-attempt throttling, successful login, and server-side session validation on protected page and API requests. Public sign-in/static assets and production builds remain available without an authenticated database session; protected requests fail closed if the database is unavailable. Apply migrations first with `npm run db:migrate`. Five failed attempts from an IP address within 15 minutes trigger a temporary rejection. For production, set the hash, session secret, and database URL only in Vercel environment configuration. Never place the raw password, hash, or signing secret in GitHub, logs, or any `NEXT_PUBLIC_` variable. Configure these secrets and validate the hosted login flow before entering real financial data.
 
 ## Continuous integration
 

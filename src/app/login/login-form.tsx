@@ -22,7 +22,7 @@ export function LoginForm() {
         setError("Unable to sign in. Check your password and try again later.");
         return;
       }
-      window.location.assign(new URL("/", window.location.href));
+      window.location.replace(new URL("/", window.location.href));
     } catch {
       setError("Unable to sign in. Please try again later.");
     } finally {
