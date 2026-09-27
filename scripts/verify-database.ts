@@ -29,8 +29,17 @@ async function main() {
   }
 }
 
-main().catch(() => {
+main().catch((error: unknown) => {
   // Driver errors may contain connection details; never print them here.
-  console.error("Server-side PostgreSQL synthetic read/write check failed.");
+  const safeMessages = new Set([
+    "DATABASE_URL is required for database operations.",
+    "DATABASE_URL must be a valid PostgreSQL connection URL.",
+    "DATABASE_URL must be a PostgreSQL URL with a host and database name.",
+    "Synthetic database read/write check failed.",
+  ]);
+  const message = error instanceof Error && safeMessages.has(error.message)
+    ? error.message
+    : "Server-side PostgreSQL synthetic read/write check failed.";
+  console.error(message);
   process.exitCode = 1;
 });
