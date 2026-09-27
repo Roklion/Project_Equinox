@@ -6,6 +6,10 @@ import { saveSession } from "@/auth/store";
 
 export async function POST(request: NextRequest) {
   const genericFailure = () => NextResponse.json({ error: "Unable to sign in." }, { status: 401 });
+  const origin = request.headers.get("origin");
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  if (origin !== request.nextUrl.origin || contentType !== "application/json") return genericFailure();
+
   const secret = process.env.SESSION_SECRET;
   const hash = process.env.APP_PASSWORD_HASH;
   if (!secret || !hash) {

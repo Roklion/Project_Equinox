@@ -42,16 +42,31 @@ afterEach(() => {
 function loginRequest(password: string) {
   return new NextRequest("http://localhost:3000/api/auth/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: "http://localhost:3000" },
     body: JSON.stringify({ password }),
   });
 }
 
 describe("login and logout", () => {
+  it("rejects cross-site form posts before reserving a login attempt", async () => {
+    vi.mocked(reserveLoginAttempt).mockClear();
+    const crossSiteForm = new NextRequest("http://localhost:3000/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://attacker.example" },
+      body: "password=synthetic-password",
+    });
+
+    const response = await login(crossSiteForm);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(reserveLoginAttempt).not.toHaveBeenCalled();
+  });
+
   it("uses only the trusted platform IP header for the throttle bucket", async () => {
     const spoofedOnly = new NextRequest("http://localhost:3000/api/auth/login", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.44" },
+      headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": "198.51.100.44" },
       body: JSON.stringify({ password: "wrong-password" }),
     });
     await login(spoofedOnly);
@@ -61,6 +76,7 @@ describe("login and logout", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
+        origin: "http://localhost:3000",
         "x-real-ip": "203.0.113.16",
         "x-forwarded-for": "198.51.100.44",
       },
