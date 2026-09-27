@@ -11,6 +11,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 - [Metrics](docs/metrics.md) defines financial measures and aggregation rules.
 - [Design system](docs/design-system.md) defines interface and interaction direction.
 - [Architecture](docs/architecture.md) defines technical boundaries and the initial platform direction.
+- [Installable app validation](docs/pwa-validation.md) lists desktop and iPhone checks for the online-only experience.
 - [Agent guidance](AGENTS.md) defines repository working practices.
 
 ## Status
