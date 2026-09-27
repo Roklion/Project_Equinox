@@ -75,6 +75,14 @@ describe("login and logout", () => {
     expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
   });
 
+  it("fails generically and logs when authentication configuration is missing", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    delete process.env.SESSION_SECRET;
+    const response = await login(loginRequest("synthetic-password"));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Unable to sign in." });
+    expect(log).toHaveBeenCalledWith("Authentication configuration is missing (SESSION_SECRET or APP_PASSWORD_HASH).");
+  });
   it("grants access with a correct password and revokes the token on logout", async () => {
     const response = await login(loginRequest("synthetic-password"));
     expect(response.status).toBe(200);

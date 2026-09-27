@@ -13,6 +13,7 @@ const oldSecret = process.env.SESSION_SECRET;
 afterEach(() => {
   process.env.SESSION_SECRET = oldSecret;
   vi.mocked(isSessionActive).mockResolvedValue(true);
+  vi.restoreAllMocks();
 });
 
 describe("route protection", () => {
@@ -53,14 +54,16 @@ describe("route protection", () => {
     expect(response.cookies.get(SESSION_COOKIE)?.maxAge).toBe(0);
   });
 
-  it("preserves a potentially valid session cookie during a database outage", async () => {
+  it("preserves a potentially valid session cookie and logs safely during a database outage", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     process.env.SESSION_SECRET = secret;
     vi.mocked(isSessionActive).mockRejectedValueOnce(new Error("database unavailable"));
     const request = new NextRequest("http://localhost:3000/", {
-      headers: { cookie: `${SESSION_COOKIE}=${createSession(secret)}` },
+      headers: { cookie: SESSION_COOKIE + "=" + createSession(secret) },
     });
     const response = await proxy(request);
     expect(response.status).toBe(307);
     expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
+    expect(log).toHaveBeenCalledWith("Session validation failed due to a database error.");
   });
 });

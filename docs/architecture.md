@@ -104,19 +104,19 @@ Validation should concentrate on domain invariants and credible data-integrity r
 
 Use focused unit tests for deterministic domain calculations, integration tests for database constraints and workflows, and a small set of responsive end-to-end tests for critical entry and review paths. Coverage targets should not substitute for meaningful scenarios.
 
-## Decisions required before implementation
+## Decisions still required
 
-- authentication and intended deployment model;
+
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
 - action correction and deletion semantics (an audit subsystem is outside EPIC 1);
 - duplicate valuation-mark handling;
 - offline and client-cache boundaries;
-- PostgreSQL hosting, backup, and recovery; and
+- PostgreSQL backup and recovery approach; and
 - whether and when imports justify a separate Python service.
 
 Multi-currency support and foreign exchange are outside the USD-only MVP.
 
 ## Authentication boundary
 
-The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie; other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.
+The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while login and logout endpoints remain reachable to handle authentication state. Auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable, and server logs use fixed messages without driver details or secret values. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie on success; if revocation fails, it returns 503 and preserves the token so the browser can retry. Other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.

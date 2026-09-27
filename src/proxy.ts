@@ -21,6 +21,7 @@ export async function proxy(request: NextRequest) {
       inactive = !valid;
     } catch {
       // Database errors fail closed; preserve the cookie so a transient outage does not erase it.
+      console.error("Session validation failed due to a database error.");
     }
   }
   if (valid) return NextResponse.next();

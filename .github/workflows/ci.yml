@@ -41,9 +41,6 @@ jobs:
       - run: npm run test:db
       - run: npm run build
       - name: Check whitespace
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff --check "${{ github.event.pull_request.base.sha }}" HEAD
-          else
-            git diff --check HEAD^ HEAD
-          fi
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: git diff --check "$BASE_SHA" "$GITHUB_SHA"

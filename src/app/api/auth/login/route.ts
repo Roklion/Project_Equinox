@@ -8,7 +8,10 @@ export async function POST(request: NextRequest) {
   const genericFailure = () => NextResponse.json({ error: "Unable to sign in." }, { status: 401 });
   const secret = process.env.SESSION_SECRET;
   const hash = process.env.APP_PASSWORD_HASH;
-  if (!secret || !hash) return genericFailure();
+  if (!secret || !hash) {
+    console.error("Authentication configuration is missing (SESSION_SECRET or APP_PASSWORD_HASH).");
+    return genericFailure();
+  }
 
   // Vercel sets x-real-ip from the client connection. Do not trust a client-supplied
   // X-Forwarded-For value as a fallback; without a trusted IP, share one bucket.
