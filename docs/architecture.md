@@ -49,7 +49,7 @@ The scaffold uses Next.js 16.3.6 and React 19.3. ESLint stays on 9 and TypeScrip
 
 Use Next.js's built-in environment loading, including `@next/env` for the migration CLI and database test configuration. Local application configuration belongs in ignored `.env.local`; database tests use `.env.test.local` or shell variables. Shell variables take precedence. `.env.example` contains only explanatory comments and empty keys.
 
-`DATABASE_URL` is required only for database operations, not for rendering or building the current empty shell. The persistence boundary validates that it is a PostgreSQL URL with a host and explicit database, without including its value in errors. `POSTGRES_PASSWORD` configures the local Docker service. `TEST_DATABASE_URL` is a separate maintenance connection for tests and never falls back to `DATABASE_URL`.
+`DATABASE_URL` is required for database operations and authenticated rendering: the route proxy checks server-side session status on protected requests, while login uses PostgreSQL-backed throttling and session persistence. It is not required to build the app or serve public routes such as sign-in and static assets. The persistence boundary validates that it is a PostgreSQL URL with a host and explicit database, without including its value in errors. `POSTGRES_PASSWORD` configures the local Docker service. `TEST_DATABASE_URL` is a separate maintenance connection for tests and never falls back to `DATABASE_URL`.
 
 Never import secrets into domain or client components. The database adapter is marked `server-only`; the migration CLI uses Node's `react-server` condition to load that marker outside Next.js. Database tests stub only this framework marker and use real PostgreSQL for all database operations. Only intentionally public values may use `NEXT_PUBLIC_`, because Next.js embeds those values in browser bundles at build time. Keep local environment files and their contents out of logs and version control.
 
@@ -90,7 +90,7 @@ Desktop and mobile should share domain and presentation primitives while composi
 
 This public repository must contain only generic names and synthetic financial values. Real personal data and private-spreadsheet content or derivatives must remain outside version control.
 
-Before production use, architecture must define authentication, authorization, intended household access, encryption, secret management, backups, deletion, and sensitive telemetry rules. Audit retention is relevant only if an audit subsystem is introduced later. Logs and error reports must avoid financial records and identifiers by default.
+Authentication for the single-household MVP is defined below. Before production use, encryption, secret management, backups, deletion, and sensitive telemetry rules still require validation. Audit retention is relevant only if an audit subsystem is introduced later. Logs and error reports must avoid financial records and identifiers by default.
 
 ## Validation strategy
 
@@ -106,9 +106,9 @@ Validation should concentrate on domain invariants and credible data-integrity r
 
 Use focused unit tests for deterministic domain calculations, integration tests for database constraints and workflows, and a small set of responsive end-to-end tests for critical entry and review paths. Coverage targets should not substitute for meaningful scenarios.
 
-## Decisions required before implementation
+## Decisions still required
 
-- authentication implementation and production secret handling (tracked in [Issue #17](https://github.com/Roklion/Project_Equinox/issues/17));
+
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
 - action correction and deletion semantics (an audit subsystem is outside EPIC 1);
@@ -118,3 +118,7 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 - whether and when imports justify a separate Python service.
 
 Multi-currency support and foreign exchange are outside the USD-only MVP.
+
+## Authentication boundary
+
+The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while login and logout endpoints remain reachable to handle authentication state. Auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable, and server logs use fixed messages without driver details or secret values. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie on success; if revocation fails, it returns 503 and preserves the token so the browser can retry. Other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.

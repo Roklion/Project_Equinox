@@ -1,0 +1,47 @@
+import { NextRequest, NextResponse } from "next/server";
+import { isValidPasswordHash, verifyPassword } from "@/auth/credentials";
+import { createSession, isValidSessionSecret, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
+import { clearLoginFailures, loginBucket, reserveLoginAttempt } from "@/auth/rate-limit";
+import { saveSession } from "@/auth/store";
+
+export async function POST(request: NextRequest) {
+  const genericFailure = () => NextResponse.json({ error: "Unable to sign in." }, { status: 401 });
+  const origin = request.headers.get("origin");
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  if (origin !== request.nextUrl.origin || contentType !== "application/json") return genericFailure();
+
+  const secret = process.env.SESSION_SECRET;
+  const hash = process.env.APP_PASSWORD_HASH;
+  if (!isValidSessionSecret(secret) || !isValidPasswordHash(hash)) {
+    console.error("Authentication configuration is missing or invalid.");
+    return genericFailure();
+  }
+
+  // Vercel sets x-real-ip from the client connection. Do not trust a client-supplied
+  // X-Forwarded-For value as a fallback; without a trusted IP, share one bucket.
+  const ip = request.headers.get("x-real-ip") ?? "unknown";
+  const bucket = loginBucket(ip, secret);
+  try {
+    if (!await reserveLoginAttempt(bucket)) return genericFailure();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return genericFailure();
+    }
+    const password = typeof body === "object" && body !== null && "password" in body
+      ? (body as { password: unknown }).password : undefined;
+    if (typeof password !== "string" || password.length > 1024 || !await verifyPassword(password, hash)) {
+      return genericFailure();
+    }
+    await clearLoginFailures(bucket);
+    const token = createSession(secret);
+    await saveSession(token);
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
+    return response;
+  } catch {
+    console.error("Login failed due to an unexpected error.");
+    return genericFailure();
+  }
+}
