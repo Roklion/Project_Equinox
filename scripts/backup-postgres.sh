@@ -13,6 +13,11 @@ if [[ ! -d "$backup_dir" || ! -w "$backup_dir" ]]; then
   exit 1
 fi
 
+if ! date -u -d 'today' +%Y%m%d >/dev/null 2>&1; then
+  echo 'GNU date is required for backup retention.' >&2
+  exit 1
+fi
+
 lock_dir="$backup_dir/.equinox-backup.lock"
 lock_acquired=false
 temporary=''
