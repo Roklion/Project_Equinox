@@ -12,6 +12,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 - [Design system](docs/design-system.md) defines interface and interaction direction.
 - [Architecture](docs/architecture.md) defines technical boundaries and the initial platform direction.
 - [Installable app validation](docs/pwa-validation.md) lists desktop and iPhone checks for the online-only experience.
+- [Backup and restore](docs/backup-and-restore.md) covers portable PostgreSQL dumps, retention, NAS scheduling, and disposable restore checks.
 - [Agent guidance](AGENTS.md) defines repository working practices.
 
 ## Status

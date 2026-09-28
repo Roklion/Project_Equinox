@@ -12,3 +12,10 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 .neon
+/backups/
+/backup/
+*.dump
+*.dump.tmp
+.equinox-*.tmp
+*.backup
+*.sql.gz

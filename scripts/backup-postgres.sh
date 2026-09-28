@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Runs inside a PostgreSQL 18.4 image (or a host with matching client tools).
+if [[ -z "${DATABASE_URL:-}" || -z "${EQUINOX_BACKUP_DIR:-}" ]]; then
+  echo 'DATABASE_URL and EQUINOX_BACKUP_DIR are required.' >&2
+  exit 1
+fi
+
+backup_dir=$EQUINOX_BACKUP_DIR
+if [[ ! -d "$backup_dir" || ! -w "$backup_dir" ]]; then
+  echo 'EQUINOX_BACKUP_DIR must be an existing writable directory.' >&2
+  exit 1
+fi
+
+lock_dir="$backup_dir/.equinox-backup.lock"
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  echo 'Another backup is running, or a stale backup lock needs inspection.' >&2
+  exit 1
+fi
+temporary=''
+cleanup() {
+  if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; fi
+  rmdir -- "$lock_dir"
+}
+trap cleanup EXIT
+
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+final="$backup_dir/equinox-$stamp.dump"
+if [[ -e "$final" ]]; then
+  echo 'A backup with this timestamp already exists.' >&2
+  exit 1
+fi
+temporary=$(mktemp "$backup_dir/.equinox-$stamp.XXXXXXXX.tmp")
+
+pg_dump --dbname="$DATABASE_URL" --format=custom --file="$temporary" 2>/dev/null || {
+  echo 'pg_dump failed; check the private connection settings and database access.' >&2
+  exit 1
+}
+[[ -s "$temporary" ]] || { echo 'pg_dump produced an empty file.' >&2; exit 1; }
+pg_restore --list "$temporary" >/dev/null 2>&1 || { echo 'Dump validation failed.' >&2; exit 1; }
+mv --no-clobber -- "$temporary" "$final"
+[[ -e "$temporary" ]] && { echo 'Backup finalization failed.' >&2; exit 1; }
+temporary=''
+echo "Validated backup created: $(basename "$final")"
+
+# Keep the newest successful dump regardless of age. Retain the newest dump
+# in each UTC day/week/month within the 14/8/12 rolling calendar windows.
+# Only this script's completed filename pattern is eligible for deletion.
+day_cutoff=$(date -u -d '13 days ago' +%Y%m%d)
+week_cutoff=$(date -u -d '7 weeks ago' +%G%V)
+month_cutoff=$(date -u -d "$(date -u +%Y-%m-01) -11 months" +%Y%m)
+declare -A days=() weeks=() months=()
+shopt -s nullglob
+files=("$backup_dir"/equinox-????????T??????Z.dump)
+if ((${#files[@]} > 0)); then
+  mapfile -t files < <(printf '%s\n' "${files[@]}" | sort -r)
+fi
+for file in "${files[@]}"; do
+  name=${file##*/}
+  [[ $name =~ ^equinox-([0-9]{8})T([0-9]{6})Z\.dump$ ]] || continue
+  day=${BASH_REMATCH[1]}
+  iso="${day:0:4}-${day:4:2}-${day:6:2}"
+  week=$(date -u -d "$iso" +%G%V 2>/dev/null) || continue
+  month=${day:0:6}
+  keep=false
+  if [[ $file == "$final" ]]; then keep=true; fi
+  if [[ $day > $day_cutoff || $day == $day_cutoff ]] && [[ ! -v days[$day] ]]; then
+    days[$day]=1; keep=true
+  fi
+  if [[ $week > $week_cutoff || $week == $week_cutoff ]] && [[ ! -v weeks[$week] ]]; then
+    weeks[$week]=1; keep=true
+  fi
+  if [[ $month > $month_cutoff || $month == $month_cutoff ]] && [[ ! -v months[$month] ]]; then
+    months[$month]=1; keep=true
+  fi
+  if [[ $keep == false ]]; then rm -- "$file"; fi
+done
