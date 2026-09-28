@@ -61,6 +61,7 @@ function InvestmentSelect({ id, label, value, onChange, options, errors, exclude
 
 export function EntryForm({ kind }: { kind: Kind }) {
   const saving = useRef(false);
+  const lastFetched = useRef<{ date: string; investmentId: string; kind: Kind; refresh: number } | null>(null);
   const browserDate = useSyncExternalStore(emptySubscribe, localCalendarDate, serverCalendarDate);
   const [dateOverride, setDateOverride] = useState<string | null>(null);
   const date = dateOverride ?? browserDate;
@@ -82,10 +83,16 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const contextInvestmentId = kind === "valuation" ? investmentId : "";
   useEffect(() => {
     if (!date) return;
+    if (lastFetched.current?.date === date && lastFetched.current.investmentId === contextInvestmentId &&
+      lastFetched.current.kind === kind && lastFetched.current.refresh === refresh) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     const query = new URLSearchParams({ date });
     if (contextInvestmentId) query.set("investmentId", contextInvestmentId);
@@ -98,9 +105,12 @@ export function EntryForm({ kind }: { kind: Kind }) {
       .then((body) => {
         if (controller.signal.aborted) return;
         setInvestments(body.investments);
+        const nextContextInvestmentId = kind === "valuation" && contextInvestmentId &&
+          body.investments.some((item) => item.id === contextInvestmentId) ? contextInvestmentId : "";
         setInvestmentId((previous) => previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
         setDestinationInvestmentId((previous) =>
           previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
+        lastFetched.current = { date, investmentId: nextContextInvestmentId, kind, refresh };
         setContext(body.context);
         setLatest(body.latest);
         setLoadError("");
@@ -143,7 +153,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
       });
       const body = await response.json();
       if (!response.ok) {
-        setErrors(body.fieldErrors ?? {});
+        const fieldErrors = body.fieldErrors ?? {};
+        setErrors(fieldErrors);
+        if (fieldErrors.notes || fieldErrors.sourceReference) setDetailsOpen(true);
         setSaveError(body.formError ?? (body.fieldErrors ? "Review the highlighted fields." : "Unable to save this entry."));
         if (kind === "valuation") { setLoading(true); setRefresh((current) => current + 1); }
         return;
@@ -169,7 +181,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           <button type="button" className="primary-button" onClick={() => {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("");
             setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({});
-            setLoadError(""); setSaveError("");
+            setLoadError(""); setSaveError(""); setDetailsOpen(false);
             if (kind === "valuation") {
               setInvestmentId(""); setLoading(true); setContext(null); setLatest(null);
             }
@@ -279,7 +291,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
           <span className="field-help">Enter a positive amount. The action determines its direction.</span>
         </div>
       )}
-      <details className="entry-details">
+      <details className="entry-details" open={detailsOpen}
+        onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
         <summary>Notes and source reference <span>Optional</span></summary>
         <div className="entry-field">
           <label htmlFor="sourceReference">Source reference</label>

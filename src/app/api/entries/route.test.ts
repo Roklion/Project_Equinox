@@ -86,6 +86,16 @@ describe("entry route", () => {
     }));
   });
 
+  it("shows a form-level error when a transfer investment is no longer available", async () => {
+    service.recordTransfer.mockRejectedValueOnce(new WorkflowError("investment_unavailable"));
+    const response = await POST(post({ kind: "transfer", sourceInvestmentId: "investment-a",
+      destinationInvestmentId: "investment-b", date: "2026-09-28", amount: "50" }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ formError:
+      "One of the selected investments is no longer available on this date. Review the transfer source and destination, then try again." });
+  });
+
   it("keeps valuation creation and explicit correction separate", async () => {
     const base = { kind: "valuation", investmentId: "investment-a",
       date: "2026-09-28", grossValue: "10.00", debt: "25.00" };

@@ -132,7 +132,13 @@ export async function POST(request: NextRequest) {
       : NextResponse.json({ formError: "Add a household and investment before recording an entry." }, { status: 409 });
   } catch (error) {
     if (error instanceof WorkflowError) {
-      const fieldErrors = failure(error.code, text(input, "kind"));
+      const kind = text(input, "kind");
+      if (error.code === "investment_unavailable" && kind === "transfer") {
+        return NextResponse.json({
+          formError: "One of the selected investments is no longer available on this date. Review the transfer source and destination, then try again.",
+        }, { status: 409 });
+      }
+      const fieldErrors = failure(error.code, kind);
       if (Object.keys(fieldErrors).length > 0) return NextResponse.json({ fieldErrors }, { status: 409 });
       return NextResponse.json({ formError: "Unable to save this entry. Please try again." }, { status: 409 });
     }
