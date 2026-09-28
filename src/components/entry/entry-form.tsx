@@ -1,0 +1,295 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import type { InvestmentOption, StoredMark } from "@/application/ports";
+import { formatCents, netValue, parseCents } from "@/domain/financial";
+
+type Kind = "contribution" | "withdrawal" | "transfer" | "valuation";
+type MarkWithNet = StoredMark & { netValue: string };
+type ValuationContext = { existing: MarkWithNet | null; previous: MarkWithNet | null };
+type LatestMark = MarkWithNet & { investmentId: string };
+type FieldErrors = Record<string, string>;
+
+function localCalendarDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function money(value: string) {
+  const negative = value.startsWith("-");
+  const cents = parseCents(negative ? value.slice(1) : value, true);
+  const normalized = formatCents(cents);
+  const [whole, fraction] = normalized.replace("-", "").split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative ? "−" : ""}$${grouped}.${fraction}`;
+}
+
+function inputError(errors: FieldErrors, field: string) {
+  return errors[field] ? <span className="field-error" role="alert">{errors[field]}</span> : null;
+}
+
+function InvestmentSelect({ id, label, value, onChange, options, errors, exclude }: {
+  id: string; label: string; value: string; onChange: (value: string) => void;
+  options: InvestmentOption[]; errors: FieldErrors; exclude?: string;
+}) {
+  return (
+    <div className="entry-field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={(event) => onChange(event.target.value)}
+        required aria-invalid={Boolean(errors[id])} aria-describedby={errors[id] ? `${id}-error` : undefined}>
+        <option value="">Choose an investment</option>
+        {options.filter((option) => option.id !== exclude).map((option) => (
+          <option key={option.id} value={option.id}>{option.name}</option>
+        ))}
+      </select>
+      {errors[id] && <span id={`${id}-error`} className="field-error" role="alert">{errors[id]}</span>}
+    </div>
+  );
+}
+
+export function EntryForm({ kind }: { kind: Kind }) {
+  const saving = useRef(false);
+  const [date, setDate] = useState("");
+  const [investmentId, setInvestmentId] = useState("");
+  const [destinationInvestmentId, setDestinationInvestmentId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [grossValue, setGrossValue] = useState("");
+  const [debt, setDebt] = useState("0");
+  const [notes, setNotes] = useState("");
+  const [sourceReference, setSourceReference] = useState("");
+  const [investments, setInvestments] = useState<InvestmentOption[]>([]);
+  const [context, setContext] = useState<ValuationContext | null>(null);
+  const [latest, setLatest] = useState<LatestMark | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [savedLabel, setSavedLabel] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDate(localCalendarDate()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!date) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({ date });
+    if (kind === "valuation" && investmentId) query.set("investmentId", investmentId);
+    fetch(`/api/entries?${query}`, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.formError ?? "Unable to load investments.");
+        return body as { investments: InvestmentOption[]; context: ValuationContext | null; latest: LatestMark | null };
+      })
+      .then((body) => {
+        setInvestments(body.investments);
+        if (investmentId && !body.investments.some((item) => item.id === investmentId)) setInvestmentId("");
+        if (destinationInvestmentId && !body.investments.some((item) => item.id === destinationInvestmentId)) {
+          setDestinationInvestmentId("");
+        }
+        setContext(body.context);
+        setLatest(body.latest);
+        setFormError("");
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setFormError(error instanceof Error ? error.message : "Unable to load investments.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [date, investmentId, destinationInvestmentId, kind, refresh]);
+
+  let enteredNet: string | null = null;
+  let enteredDelta: string | null = null;
+  if (kind === "valuation" && grossValue !== "" && debt !== "") {
+    try {
+      enteredNet = netValue(grossValue, debt);
+      if (context?.previous) {
+        enteredDelta = formatCents(parseCents(enteredNet.replace("-", ""), true) *
+          (enteredNet.startsWith("-") ? -1n : 1n) -
+          parseCents(context.previous.netValue.replace("-", ""), true) *
+          (context.previous.netValue.startsWith("-") ? -1n : 1n));
+      }
+    } catch { /* Show field validation after submit. */ }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving.current || loading) return;
+    saving.current = true;
+    setBusy(true);
+    setErrors({});
+    setFormError("");
+    const payload = {
+      kind, date, investmentId, sourceInvestmentId: investmentId, destinationInvestmentId,
+      amount, grossValue, debt, notes, sourceReference,
+      operation: context?.existing ? "replace" : "create",
+    };
+    try {
+      const response = await fetch("/api/entries", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setErrors(body.fieldErrors ?? {});
+        setFormError(body.formError ?? (body.fieldErrors ? "Review the highlighted fields." : "Unable to save this entry."));
+        if (kind === "valuation") { setLoading(true); setRefresh((current) => current + 1); }
+        return;
+      }
+      setSavedLabel(kind === "valuation" ? (context?.existing ? "Valuation corrected" : "Valuation saved")
+        : kind === "transfer" ? "Transfer saved" : kind === "contribution" ? "Contribution saved" : "Withdrawal saved");
+      setSaved(true);
+      setRefresh((current) => current + 1);
+    } catch {
+      setFormError("Unable to save this entry. Please try again.");
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+  }
+
+  if (saved) {
+    return (
+      <section className="entry-panel entry-success" role="status">
+        <p className="eyebrow">Saved</p><h2>{savedLabel}</h2>
+        <p>Your entry is recorded for {date}. You can add another entry or return to the overview.</p>
+        <div className="entry-actions">
+          <button type="button" className="primary-button" onClick={() => {
+            setSaved(false); setAmount(""); setGrossValue(""); setDebt("0");
+            setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({}); setFormError("");
+          }}>Add another</button>
+          <Link href="/">Overview</Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <form className="entry-panel entry-form" onSubmit={submit}>
+      <p className="entry-hint">
+        {kind === "transfer" ? "Move value between two investments with one linked transfer." :
+          kind === "valuation" ? "Record what this investment was worth on a specific date." :
+            kind === "contribution" ? "Record value added from outside your tracked investments." :
+              "Record value leaving your tracked investments."}
+      </p>
+      <div className="entry-field">
+        <label htmlFor="entry-date">{kind === "valuation" ? "As-of date" : "Effective date"}</label>
+        <input id="entry-date" type="date" value={date} onChange={(event) => {
+          setDate(event.target.value); setLoading(true); setContext(null); setLatest(null);
+        }}
+          required aria-invalid={Boolean(errors.date)} />
+        {inputError(errors, "date")}
+      </div>
+      {kind === "transfer" ? (
+        <div className="transfer-pair">
+          <InvestmentSelect id="investmentId" label="Move value from" value={investmentId}
+            onChange={(value) => {
+              setInvestmentId(value); setLoading(true);
+              if (value === destinationInvestmentId) setDestinationInvestmentId("");
+            }}
+            options={investments} errors={errors} />
+          <InvestmentSelect id="destinationInvestmentId" label="Move value to" value={destinationInvestmentId}
+            onChange={(value) => { setDestinationInvestmentId(value); setLoading(true); }}
+            options={investments} errors={errors} exclude={investmentId} />
+        </div>
+      ) : (
+        <InvestmentSelect id="investmentId" label="Investment" value={investmentId}
+          onChange={(value) => {
+            setInvestmentId(value); setLoading(true); setContext(null); setLatest(null);
+          }}
+          options={investments} errors={errors} />
+      )}
+      {loading && <p className="entry-muted" role="status">Checking investments and date…</p>}
+      {!loading && !formError && investments.length === 0 && (
+        <p className="entry-muted">No investments are available on this date.</p>
+      )}
+      {kind === "valuation" ? (
+        <>
+          {context?.existing && (
+            <div className="correction-notice">
+              <strong>Existing mark on {date}</strong>
+              <p>Saving will correct this mark. It will not create a second mark.</p>
+            </div>
+          )}
+          <div className="entry-money-pair">
+            <div className="entry-field">
+              <label htmlFor="grossValue">Gross investment value</label>
+              <div className="money-input"><span aria-hidden="true">$</span><input id="grossValue" type="text"
+                inputMode="decimal" value={grossValue} onChange={(event) => setGrossValue(event.target.value)}
+                placeholder="0.00" required aria-invalid={Boolean(errors.grossValue)} /></div>
+              {inputError(errors, "grossValue")}
+            </div>
+            <div className="entry-field">
+              <label htmlFor="debt">Investment-linked debt</label>
+              <div className="money-input"><span aria-hidden="true">$</span><input id="debt" type="text"
+                inputMode="decimal" value={debt} onChange={(event) => setDebt(event.target.value)}
+                required aria-invalid={Boolean(errors.debt)} /></div>
+              {inputError(errors, "debt")}
+            </div>
+          </div>
+          {(enteredNet !== null || context?.previous || latest) && (
+            <section className="valuation-preview" aria-label="Valuation preview">
+              {enteredNet !== null && <div><span>Entered net value</span><strong>{money(enteredNet)}</strong></div>}
+              {latest && latest.asOfDate !== context?.previous?.asOfDate && (
+                <>
+                  <p>Latest mark · {latest.asOfDate}</p>
+                  <div><span>Net value</span><span>{money(latest.netValue)}</span></div>
+                </>
+              )}
+              {context?.previous && <>
+                <p>Previous mark · {context.previous.asOfDate}</p>
+                <div><span>Gross value</span><span>{money(context.previous.grossValue)}</span></div>
+                <div><span>Linked debt</span><span>{money(context.previous.debt)}</span></div>
+                <div><span>Net value</span><span>{money(context.previous.netValue)}</span></div>
+              </>}
+              {enteredDelta !== null && <div className="preview-delta"><span>Change from previous net</span>
+                <strong>{enteredDelta.startsWith("-") ? "" : "+"}{money(enteredDelta)}</strong></div>}
+            </section>
+          )}
+          {inputError(errors, "operation")}
+        </>
+      ) : (
+        <div className="entry-field">
+          <label htmlFor="amount">{kind === "transfer" ? "Amount to move" :
+            kind === "contribution" ? "Amount contributed" : "Amount withdrawn"}</label>
+          <div className="money-input"><span aria-hidden="true">$</span><input id="amount" type="text"
+            inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)}
+            placeholder="0.00" required aria-invalid={Boolean(errors.amount)} /></div>
+          {inputError(errors, "amount")}
+          <span className="field-help">Enter a positive amount. The action determines its direction.</span>
+        </div>
+      )}
+      <details className="entry-details">
+        <summary>Notes and source reference <span>Optional</span></summary>
+        <div className="entry-field">
+          <label htmlFor="sourceReference">Source reference</label>
+          <input id="sourceReference" type="text" value={sourceReference}
+            onChange={(event) => setSourceReference(event.target.value)} maxLength={200} />
+          {inputError(errors, "sourceReference")}
+        </div>
+        <div className="entry-field">
+          <label htmlFor="notes">Notes</label>
+          <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)}
+            rows={3} maxLength={2000} />
+          {inputError(errors, "notes")}
+        </div>
+      </details>
+      {formError && <p role="alert" className="form-error">{formError}</p>}
+      <div className="entry-actions">
+        <button className="primary-button" type="submit" disabled={busy || loading || investments.length === 0}>
+          {busy ? "Saving…" : kind === "valuation" && context?.existing ? "Correct existing mark" :
+            kind === "transfer" ? "Save transfer" : kind === "valuation" ? "Save valuation mark" :
+              kind === "contribution" ? "Save contribution" : "Save withdrawal"}
+        </button>
+        <Link href="/add">Choose another action</Link>
+      </div>
+    </form>
+  );
+}
