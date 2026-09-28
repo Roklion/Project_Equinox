@@ -17,7 +17,10 @@ function valuationDebt(input: EntryInput): string {
 function validate(input: EntryInput): FieldErrors {
   const errors: FieldErrors = {};
   const kind = text(input, "kind");
-  if (!["contribution", "withdrawal", "transfer", "valuation"].includes(kind)) errors.kind = "Choose an action.";
+  if (!["contribution", "withdrawal", "transfer", "valuation"].includes(kind)) {
+    errors.kind = "Choose an action.";
+    return errors;
+  }
   try { assertCalendarDate(text(input, "date")); }
   catch { errors.date = "Enter a valid calendar date."; }
   if (!text(input, "investmentId") && kind !== "transfer") errors.investmentId = "Choose an investment.";
@@ -41,10 +44,12 @@ function validate(input: EntryInput): FieldErrors {
   return errors;
 }
 
-function failure(code: string) {
+function failure(code: string, kind: string) {
   switch (code) {
     case "invalid_date": return { date: "Enter a valid calendar date." };
-    case "invalid_money": return { amount: "Enter a valid amount." };
+    case "invalid_money": return kind === "valuation"
+      ? { grossValue: "Enter a valid value." }
+      : { amount: "Enter a valid amount." };
     case "invalid_transfer": return { destinationInvestmentId: "Choose a different destination investment." };
     case "investment_unavailable": return { investmentId: "This investment is unavailable on that date. Refresh the choices." };
     case "mark_already_exists": return { operation: "A mark already exists on this date. Refresh and choose the correction action." };
@@ -69,7 +74,7 @@ export async function GET(request: NextRequest) {
         : null;
       return { investments, context, latest };
     });
-    return result
+    return result !== null
       ? NextResponse.json(result, { headers: { "Cache-Control": "no-store" } })
       : NextResponse.json({ formError: "Add a household and investment before recording an entry." }, { status: 409 });
   } catch {
@@ -117,12 +122,12 @@ export async function POST(request: NextRequest) {
         kind: kind as "contribution" | "withdrawal", effectiveDate: date,
         amount: text(input, "amount"), ...provenance });
     });
-    return result
+    return result !== null
       ? NextResponse.json({ ok: true })
       : NextResponse.json({ formError: "Add a household and investment before recording an entry." }, { status: 409 });
   } catch (error) {
     if (error instanceof WorkflowError) {
-      const fieldErrors = failure(error.code);
+      const fieldErrors = failure(error.code, text(input, "kind"));
       if (Object.keys(fieldErrors).length > 0) return NextResponse.json({ fieldErrors }, { status: 409 });
       return NextResponse.json({ formError: "Unable to save this entry. Please try again." }, { status: 409 });
     }

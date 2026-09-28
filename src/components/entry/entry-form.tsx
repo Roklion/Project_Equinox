@@ -96,6 +96,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         return body as { investments: InvestmentOption[]; context: ValuationContext | null; latest: LatestMark | null };
       })
       .then((body) => {
+        if (controller.signal.aborted) return;
         setInvestments(body.investments);
         setInvestmentId((previous) => previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
         setDestinationInvestmentId((previous) =>

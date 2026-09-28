@@ -65,6 +65,13 @@ describe("entry route", () => {
     expect(service.recordExternalAction).not.toHaveBeenCalled();
   });
 
+  it("rejects an unsupported action before validating fields for other workflows", async () => {
+    const response = await POST(post({ kind: "unknown" }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ fieldErrors: { kind: "Choose an action." } });
+    expect(withEntryService).not.toHaveBeenCalled();
+  });
+
   it("sends one transfer command and rejects identical endpoints", async () => {
     const same = await POST(post({ kind: "transfer", sourceInvestmentId: "investment-a",
       destinationInvestmentId: "investment-a", date: "2026-09-28", amount: "50" }));
@@ -115,6 +122,14 @@ describe("entry route", () => {
     expect(service.replaceValuationMark).not.toHaveBeenCalled();
   });
 
+  it("maps valuation workflow money errors to a valuation field", async () => {
+    service.recordValuationMark.mockRejectedValueOnce(new WorkflowError("invalid_money"));
+    const response = await POST(post({ kind: "valuation", investmentId: "investment-a",
+      date: "2026-09-28", grossValue: "10.00", debt: "25.00", operation: "create" }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ fieldErrors: { grossValue: expect.any(String) } });
+  });
+
   it("returns a form error for workflow failures with no field mapping", async () => {
     service.recordValuationMark.mockRejectedValueOnce(new WorkflowError("empty_correction"));
     const response = await POST(post({ kind: "valuation", investmentId: "investment-a",
@@ -138,6 +153,17 @@ describe("entry route", () => {
       context: { existing: { netValue: "-15.00" } },
       latest: { investmentId: "investment-a", netValue: "-15.00" },
     });
+  });
+
+  it("uses the missing-household response only for a null service context", async () => {
+    vi.mocked(withEntryService).mockImplementationOnce(async () => null);
+    const get = await GET(new NextRequest("http://localhost:3000/api/entries?date=2026-09-28"));
+    expect(get.status).toBe(409);
+
+    vi.mocked(withEntryService).mockImplementationOnce(async () => null);
+    const postResponse = await POST(post({ kind: "contribution", investmentId: "investment-a",
+      date: "2026-09-28", amount: "10.00" }));
+    expect(postResponse.status).toBe(409);
   });
 
   it("rejects a cross-origin write", async () => {
