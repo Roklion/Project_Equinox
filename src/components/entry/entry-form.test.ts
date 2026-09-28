@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 import { EntryForm } from "./entry-form";
 
 describe("entry form semantics", () => {
+  it("does not show an unavailable-investments message before a date is entered", () => {
+    const html = renderToStaticMarkup(createElement(EntryForm, { kind: "contribution" }));
+    expect(html).not.toContain("No investments are available on this date.");
+  });
+
   it("presents a single linked transfer with distinct source and destination choices", () => {
     const html = renderToStaticMarkup(createElement(EntryForm, { kind: "transfer" }));
     expect(html).toContain("Move value from");

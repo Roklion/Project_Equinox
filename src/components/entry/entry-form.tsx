@@ -79,6 +79,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedLabel, setSavedLabel] = useState("");
+  const [savedDate, setSavedDate] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loadError, setLoadError] = useState("");
@@ -162,6 +163,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       }
       setSavedLabel(kind === "valuation" ? (context?.existing ? "Valuation corrected" : "Valuation saved")
         : kind === "transfer" ? "Transfer saved" : kind === "contribution" ? "Contribution saved" : "Withdrawal saved");
+      setSavedDate(payload.date);
       setSaved(true);
       setRefresh((current) => current + 1);
     } catch {
@@ -176,7 +178,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
     return (
       <section className="entry-panel entry-success" role="status">
         <p className="eyebrow">Saved</p><h2>{savedLabel}</h2>
-        <p>Your entry is recorded for {date}. You can add another entry or return to the overview.</p>
+        <p>Your entry is recorded for {savedDate}. You can add another entry or return to the overview.</p>
         <div className="entry-actions">
           <button type="button" className="primary-button" onClick={() => {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("");
@@ -231,7 +233,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           options={investments} errors={errors} />
       )}
       {loading && <p className="entry-muted" role="status">Checking investments and date…</p>}
-      {!loading && !loadError && !saveError && investments.length === 0 && (
+      {!loading && !loadError && !saveError && date && investments.length === 0 && (
         <p className="entry-muted">No investments are available on this date.</p>
       )}
       {kind === "valuation" ? (
