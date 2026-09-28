@@ -114,9 +114,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
 
   let enteredNet: string | null = null;
   let enteredDelta: string | null = null;
-  if (kind === "valuation" && grossValue !== "" && debt !== "") {
+  if (kind === "valuation" && grossValue !== "") {
     try {
-      enteredNet = netValue(grossValue, debt);
+      enteredNet = netValue(grossValue, debt || "0");
       if (context?.previous) {
         enteredDelta = formatCents(parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue));
       }
@@ -169,6 +169,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("0");
             setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({});
             setLoadError(""); setSaveError("");
+            if (kind === "valuation") {
+              setInvestmentId(""); setLoading(true); setContext(null); setLatest(null);
+            }
           }}>Add another</button>
           <Link href="/">Overview</Link>
         </div>
@@ -235,7 +238,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
               <label htmlFor="debt">Investment-linked debt</label>
               <div className="money-input"><span aria-hidden="true">$</span><input id="debt" type="text"
                 inputMode="decimal" value={debt} onChange={(event) => setDebt(event.target.value)}
-                required aria-invalid={Boolean(errors.debt)} /></div>
+                placeholder="0.00" aria-invalid={Boolean(errors.debt)} /></div>
+              <span className="field-help">Optional. Leave blank to use zero.</span>
               {inputError(errors, "debt")}
             </div>
           </div>
