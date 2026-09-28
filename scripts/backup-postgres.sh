@@ -13,27 +13,42 @@ if [[ ! -d "$backup_dir" || ! -w "$backup_dir" ]]; then
   exit 1
 fi
 
-lock_file="$backup_dir/.equinox-backup.lock"
-lock_token=''
+lock_dir="$backup_dir/.equinox-backup.lock"
+lock_acquired=false
 temporary=''
+dump_pid=''
+dump_starting=false
+pending_signal=''
 cleanup() {
   if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; fi
-  if [[ -n "$lock_token" ]]; then
-    if [[ -e "$lock_file" && "$lock_file" -ef "$lock_token" ]]; then
-      rm -f -- "$lock_file"
-    fi
-    rm -f -- "$lock_token"
+  if [[ "$lock_acquired" == true ]]; then
+    rmdir -- "$lock_dir" 2>/dev/null || true
   fi
 }
+terminate_on_signal() {
+  local signal=$1
+  local exit_status=$2
+  if [[ "$dump_starting" == true && -z "$dump_pid" ]]; then
+    pending_signal=$signal
+    return
+  fi
+  if [[ -n "$dump_pid" ]]; then
+    trap '' INT TERM
+    kill -s "$signal" "$dump_pid" 2>/dev/null || true
+    wait "$dump_pid" 2>/dev/null || true
+    dump_pid=''
+  fi
+  exit "$exit_status"
+}
 trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'terminate_on_signal INT 130' INT
+trap 'terminate_on_signal TERM 143' TERM
 
-lock_token=$(mktemp "$backup_dir/.equinox-lock.XXXXXXXX.tmp")
-if ! ln -- "$lock_token" "$lock_file" 2>/dev/null; then
+if ! mkdir -- "$lock_dir" 2>/dev/null; then
   echo 'Another backup is running, or a stale backup lock needs inspection.' >&2
   exit 1
 fi
+lock_acquired=true
 
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 final="$backup_dir/equinox-$stamp.dump"
@@ -43,10 +58,23 @@ if [[ -e "$final" ]]; then
 fi
 temporary=$(mktemp "$backup_dir/.equinox-$stamp.XXXXXXXX.tmp")
 
-pg_dump --dbname="$DATABASE_URL" --format=custom --file="$temporary" || {
+dump_starting=true
+pg_dump --dbname="$DATABASE_URL" --format=custom --file="$temporary" &
+dump_pid=$!
+dump_starting=false
+if [[ -n "$pending_signal" ]]; then
+  if [[ "$pending_signal" == INT ]]; then
+    terminate_on_signal INT 130
+  else
+    terminate_on_signal TERM 143
+  fi
+fi
+if ! wait "$dump_pid"; then
+  dump_pid=''
   echo 'pg_dump failed; check the private connection settings and database access.' >&2
   exit 1
-}
+fi
+dump_pid=''
 [[ -s "$temporary" ]] || { echo 'pg_dump produced an empty file.' >&2; exit 1; }
 pg_restore --list "$temporary" >/dev/null || { echo 'Dump validation failed.' >&2; exit 1; }
 mv --no-clobber -- "$temporary" "$final"
