@@ -113,6 +113,20 @@ describe("entry route", () => {
       expect.objectContaining({ grossValue: "10.00", debt: "0" }));
   });
 
+  it("preserves existing debt when a replacement leaves debt blank", async () => {
+    service.getValuationContext.mockResolvedValueOnce({
+      existing: { asOfDate: "2026-09-28", grossValue: "100.00", debt: "25.00", netValue: "75.00" },
+      previous: null,
+    });
+    const response = await POST(post({ kind: "valuation", investmentId: "investment-a",
+      date: "2026-09-28", grossValue: "110.00", debt: "", operation: "replace" }));
+
+    expect(response.status).toBe(200);
+    expect(service.replaceValuationMark).toHaveBeenCalledWith(expect.objectContaining({
+      grossValue: "110.00", debt: "25.00", asOfDate: "2026-09-28",
+    }));
+  });
+
   it("reports an existing same-date mark without replacing it", async () => {
     service.recordValuationMark.mockRejectedValueOnce(new WorkflowError("mark_already_exists"));
     const response = await POST(post({ kind: "valuation", investmentId: "investment-a",

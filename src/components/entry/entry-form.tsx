@@ -117,7 +117,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
   let enteredDelta: string | null = null;
   if (kind === "valuation" && grossValue !== "") {
     try {
-      enteredNet = netValue(grossValue, debt || "0");
+      enteredNet = netValue(grossValue, debt || context?.existing?.debt || "0");
       if (context?.previous) {
         enteredDelta = formatCents(parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue));
       }
@@ -225,7 +225,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           {context?.existing && (
             <div className="correction-notice">
               <strong>Existing mark on {date}</strong>
-              <p>Saving will correct this mark. It will not create a second mark.</p>
+              <p>Saving will correct this mark. Leave debt blank to keep its current amount, or enter zero to remove it.</p>
             </div>
           )}
           <div className="entry-money-pair">
@@ -241,7 +241,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
               <div className="money-input"><span aria-hidden="true">$</span><input id="debt" type="text"
                 inputMode="decimal" value={debt} onChange={(event) => setDebt(event.target.value)}
                 placeholder="0.00" aria-invalid={Boolean(errors.debt)} /></div>
-              <span className="field-help">Optional. Leave blank to use zero.</span>
+              <span className="field-help">{context?.existing
+                ? `Optional. Leave blank to keep current debt of ${money(context.existing.debt)}; enter 0 to remove it.`
+                : "Optional. Leave blank to use zero."}</span>
               {inputError(errors, "debt")}
             </div>
           </div>

@@ -10,8 +10,8 @@ function text(input: EntryInput, key: string): string {
   return typeof input[key] === "string" ? input[key].trim() : "";
 }
 
-function valuationDebt(input: EntryInput): string {
-  return text(input, "debt") || "0";
+function valuationDebt(input: EntryInput, blankFallback = "0"): string {
+  return text(input, "debt") || blankFallback;
 }
 
 function validate(input: EntryInput): FieldErrors {
@@ -113,9 +113,14 @@ export async function POST(request: NextRequest) {
           amount: text(input, "amount"), ...provenance });
       }
       if (kind === "valuation") {
-        const mark = { householdId, investmentId: text(input, "investmentId"), asOfDate: date,
-          grossValue: text(input, "grossValue"), debt: valuationDebt(input), ...provenance };
-        return text(input, "operation") === "replace"
+        const investmentId = text(input, "investmentId");
+        const operation = text(input, "operation");
+        const existing = operation === "replace"
+          ? (await service.getValuationContext(householdId, investmentId, date)).existing
+          : null;
+        const mark = { householdId, investmentId, asOfDate: date,
+          grossValue: text(input, "grossValue"), debt: valuationDebt(input, existing?.debt ?? "0"), ...provenance };
+        return operation === "replace"
           ? service.replaceValuationMark(mark) : service.recordValuationMark(mark);
       }
       return service.recordExternalAction({ householdId, investmentId: text(input, "investmentId"),
