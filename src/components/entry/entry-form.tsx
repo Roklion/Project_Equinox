@@ -37,7 +37,7 @@ function money(value: string) {
 }
 
 function inputError(errors: FieldErrors, field: string) {
-  return errors[field] ? <span className="field-error" role="alert">{errors[field]}</span> : null;
+  return errors[field] ? <span id={`${field}-error`} className="field-error" role="alert">{errors[field]}</span> : null;
 }
 
 function InvestmentSelect({ id, label, value, onChange, options, errors, exclude }: {
@@ -54,7 +54,7 @@ function InvestmentSelect({ id, label, value, onChange, options, errors, exclude
           <option key={option.id} value={option.id}>{option.name}</option>
         ))}
       </select>
-      {errors[id] && <span id={`${id}-error`} className="field-error" role="alert">{errors[id]}</span>}
+      {inputError(errors, id)}
     </div>
   );
 }
@@ -125,9 +125,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
 
   let enteredNet: string | null = null;
   let enteredDelta: bigint | null = null;
-  if (kind === "valuation" && grossValue !== "") {
+  if (kind === "valuation" && grossValue.trim() !== "") {
     try {
-      enteredNet = netValue(grossValue, debt || context?.existing?.debt || "0");
+      enteredNet = netValue(grossValue.trim(), debt.trim() || context?.existing?.debt || "0");
       if (context?.previous) {
         enteredDelta = parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue);
       }
@@ -203,9 +203,11 @@ export function EntryForm({ kind }: { kind: Kind }) {
       <div className="entry-field">
         <label htmlFor="entry-date">{kind === "valuation" ? "As-of date" : "Effective date"}</label>
         <input id="entry-date" type="date" value={date} onChange={(event) => {
-          setDateOverride(event.target.value); setLoading(true); setInvestments([]); setContext(null); setLatest(null);
+          const nextDate = event.target.value;
+          lastFetched.current = null;
+          setDateOverride(nextDate); setLoading(Boolean(nextDate)); setInvestments([]); setContext(null); setLatest(null);
         }}
-          required aria-invalid={Boolean(errors.date)} />
+          required aria-invalid={Boolean(errors.date)} aria-describedby={errors.date ? "date-error" : undefined} />
         {inputError(errors, "date")}
       </div>
       {kind === "transfer" ? (
@@ -245,15 +247,17 @@ export function EntryForm({ kind }: { kind: Kind }) {
               <label htmlFor="grossValue">Gross investment value</label>
               <div className="money-input"><span aria-hidden="true">$</span><input id="grossValue" type="text"
                 inputMode="decimal" value={grossValue} onChange={(event) => setGrossValue(event.target.value)}
-                placeholder="0.00" required aria-invalid={Boolean(errors.grossValue)} /></div>
+                placeholder="0.00" required aria-invalid={Boolean(errors.grossValue)}
+                aria-describedby={errors.grossValue ? "grossValue-error" : undefined} /></div>
               {inputError(errors, "grossValue")}
             </div>
             <div className="entry-field">
               <label htmlFor="debt">Investment-linked debt</label>
               <div className="money-input"><span aria-hidden="true">$</span><input id="debt" type="text"
                 inputMode="decimal" value={debt} onChange={(event) => setDebt(event.target.value)}
-                placeholder="0.00" aria-invalid={Boolean(errors.debt)} /></div>
-              <span className="field-help">{context?.existing
+                placeholder="0.00" aria-invalid={Boolean(errors.debt)}
+                aria-describedby={`debt-help${errors.debt ? " debt-error" : ""}`} /></div>
+              <span id="debt-help" className="field-help">{context?.existing
                 ? `Optional. Leave blank to keep current debt of ${money(context.existing.debt)}; enter 0 to remove it.`
                 : "Optional. Leave blank to use zero."}</span>
               {inputError(errors, "debt")}
@@ -286,9 +290,10 @@ export function EntryForm({ kind }: { kind: Kind }) {
             kind === "contribution" ? "Amount contributed" : "Amount withdrawn"}</label>
           <div className="money-input"><span aria-hidden="true">$</span><input id="amount" type="text"
             inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)}
-            placeholder="0.00" required aria-invalid={Boolean(errors.amount)} /></div>
+            placeholder="0.00" required aria-invalid={Boolean(errors.amount)}
+            aria-describedby={`amount-help${errors.amount ? " amount-error" : ""}`} /></div>
           {inputError(errors, "amount")}
-          <span className="field-help">Enter a positive amount. The action determines its direction.</span>
+          <span id="amount-help" className="field-help">Enter a positive amount. The action determines its direction.</span>
         </div>
       )}
       <details className="entry-details" open={detailsOpen}
@@ -297,13 +302,16 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <div className="entry-field">
           <label htmlFor="sourceReference">Source reference</label>
           <input id="sourceReference" type="text" value={sourceReference}
-            onChange={(event) => setSourceReference(event.target.value)} maxLength={200} />
+            onChange={(event) => setSourceReference(event.target.value)} maxLength={200}
+            aria-invalid={Boolean(errors.sourceReference)}
+            aria-describedby={errors.sourceReference ? "sourceReference-error" : undefined} />
           {inputError(errors, "sourceReference")}
         </div>
         <div className="entry-field">
           <label htmlFor="notes">Notes</label>
           <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)}
-            rows={3} maxLength={2000} />
+            rows={3} maxLength={2000} aria-invalid={Boolean(errors.notes)}
+            aria-describedby={errors.notes ? "notes-error" : undefined} />
           {inputError(errors, "notes")}
         </div>
       </details>
