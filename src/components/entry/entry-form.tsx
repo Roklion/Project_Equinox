@@ -124,12 +124,12 @@ export function EntryForm({ kind }: { kind: Kind }) {
   }, [date, contextInvestmentId, kind, refresh]);
 
   let enteredNet: string | null = null;
-  let enteredDelta: string | null = null;
+  let enteredDelta: bigint | null = null;
   if (kind === "valuation" && grossValue !== "") {
     try {
       enteredNet = netValue(grossValue, debt || context?.existing?.debt || "0");
       if (context?.previous) {
-        enteredDelta = formatCents(parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue));
+        enteredDelta = parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue);
       }
     } catch { /* Show field validation after submit. */ }
   }
@@ -275,7 +275,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
                 <div><span>Net value</span><span>{money(context.previous.netValue)}</span></div>
               </>}
               {enteredDelta !== null && <div className="preview-delta"><span>Change from previous net</span>
-                <strong>{enteredDelta.startsWith("-") ? "" : "+"}{money(enteredDelta)}</strong></div>}
+                <strong>{enteredDelta > 0n ? "+" : ""}{money(formatCents(enteredDelta))}</strong></div>}
             </section>
           )}
           {inputError(errors, "operation")}

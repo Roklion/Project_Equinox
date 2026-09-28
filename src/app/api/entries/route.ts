@@ -25,9 +25,11 @@ function validate(input: EntryInput): FieldErrors {
   catch { errors.date = "Enter a valid calendar date."; }
   if (!text(input, "investmentId") && kind !== "transfer") errors.investmentId = "Choose an investment.";
   if (kind === "transfer") {
-    if (!text(input, "sourceInvestmentId")) errors.sourceInvestmentId = "Choose where value moves from.";
-    if (!text(input, "destinationInvestmentId")) errors.destinationInvestmentId = "Choose where value moves to.";
-    if (text(input, "sourceInvestmentId") && text(input, "sourceInvestmentId") === text(input, "destinationInvestmentId")) {
+    const sourceId = text(input, "sourceInvestmentId");
+    const destinationId = text(input, "destinationInvestmentId");
+    if (!sourceId) errors.sourceInvestmentId = "Choose where value moves from.";
+    if (!destinationId) errors.destinationInvestmentId = "Choose where value moves to.";
+    if (sourceId && sourceId === destinationId) {
       errors.destinationInvestmentId = "Choose a different destination investment.";
     }
   }
