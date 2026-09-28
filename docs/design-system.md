@@ -60,7 +60,7 @@ Desktop can use side-by-side summaries, charts, filters, and tables when width s
 
 Entry surfaces should default dates and recent selections when safe, accept keyboard and touch input efficiently, validate close to the field, and keep financial signs understandable through language such as contribution and distribution.
 
-Batch valuation entry should allow a user to choose an as-of date, review a list of relevant investments, enter gross value and linked debt efficiently, see derived NAV before saving, and identify omissions or invalid entries without losing valid work. Exact partial-save and correction behavior remains to be decided.
+Batch valuation entry should allow a user to choose an as-of date, review a list of relevant investments, enter gross value and linked debt efficiently, see derived NAV before saving, and identify omissions or invalid entries without losing entered values. Untouched blank rows are omitted. Validate all entered rows together and save them atomically; an invalid or conflicting row prevents the whole batch from being written. A same-date mark requires an explicit create or replacement choice, and validation or write failures keep the entered values available for correction.
 
 ## Component direction
 

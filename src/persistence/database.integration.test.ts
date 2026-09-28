@@ -252,6 +252,8 @@ describe("PostgreSQL persistence", () => {
       assetClassId: assetClass.id, institutionId: institution.id });
     const b = await service.createInvestment({ householdId: home.id, name: "Same name", ownerIds: [owner.id] });
     const c = await service.createInvestment({ householdId: home.id, name: "C", ownerIds: [owner.id] });
+    const prior = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
+      asOfDate: "2026-06-01", grossValue: "10" });
     const old = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
       asOfDate: "2026-07-01", grossValue: "20", debt: "25" });
     await service.closeInvestment(home.id, c.id, "2026-07-01");
@@ -291,6 +293,9 @@ describe("PostgreSQL persistence", () => {
       expect.objectContaining({ id: b.id, assetClass: null, institution: null }),
     ]));
     expect(eligible).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: c.id })]));
+    await expect(service.getValuationContext(home.id, b.id, "2026-07-01")).resolves.toMatchObject({
+      existing: { id: old.id }, previous: { id: prior.id },
+    });
     await service.deleteValuationMark(home.id, a.id, "2026-07-01");
     await expect(service.deleteValuationMark(home.id, a.id, "2026-07-01"))
       .rejects.toMatchObject({ code: "mark_not_found" });

@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
 import { assertCalendarDate, formatCents, parseCents, type Provenance } from "@/domain/financial";
 import { WorkflowError } from "@/application/errors";
-import type { EditExternalAction, EditTransfer, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement, WriteValuationMark } from "@/application/ports";
+import type { EditExternalAction, EditTransfer, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
   accountTypes, actions, assetClasses, institutions, investmentOwners, investments, liquidities, movements, taxStatuses, valuationMarks,
@@ -205,24 +205,70 @@ export async function deleteValuationMark(db: Database, householdId: string, inv
 }
 
 export async function saveValuationBatch(db: Database, input: SaveValuationBatch) {
+  assertCalendarDate(input.asOfDate);
+  const rows = input.rows.map((row) => {
+    if (row.operation === "create") return { ...row,
+      grossValue: exactAmount(row.grossValue, true), debt: exactAmount(row.debt ?? "0", true) };
+    if ([row.grossValue, row.debt, row.source, row.sourceReference, row.notes]
+      .every((value) => value === undefined)) throw new WorkflowError("empty_correction");
+    return { ...row,
+      grossValue: row.grossValue === undefined ? undefined : exactAmount(row.grossValue, true),
+      debt: row.debt === undefined ? undefined : exactAmount(row.debt, true) };
+  });
+  if (rows.length === 0) return [];
+
   return db.transaction(async (tx) => {
     const seen = new Set<string>();
-    for (const row of input.rows) {
+    const investmentIds = rows.map((row) => {
       if (seen.has(row.investmentId)) throw new WorkflowError("duplicate_batch_investment");
       seen.add(row.investmentId);
-      if (row.operation === "create") await requireValidActivityDate(tx, input.householdId, row.investmentId, input.asOfDate);
-      const [existing] = await tx.select({ id: valuationMarks.id }).from(valuationMarks).where(and(
-        eq(valuationMarks.householdId, input.householdId), eq(valuationMarks.investmentId, row.investmentId),
-        eq(valuationMarks.asOfDate, input.asOfDate)));
-      if (row.operation === "create" && existing) throw new WorkflowError("mark_already_exists");
-      if (row.operation === "replace" && !existing) throw new WorkflowError("mark_not_found");
+      return row.investmentId;
+    });
+    const [investmentRows, existingRows] = await Promise.all([
+      tx.select({ id: investments.id, status: investments.status, closedOn: investments.closedOn })
+        .from(investments).where(and(eq(investments.householdId, input.householdId), inArray(investments.id, investmentIds))),
+      tx.select({ id: valuationMarks.id, investmentId: valuationMarks.investmentId }).from(valuationMarks).where(and(
+        eq(valuationMarks.householdId, input.householdId), eq(valuationMarks.asOfDate, input.asOfDate),
+        inArray(valuationMarks.investmentId, investmentIds))),
+    ]);
+    const investmentsById = new Map(investmentRows.map((investment) => [investment.id, investment]));
+    const existingByInvestment = new Map(existingRows.map((mark) => [mark.investmentId, mark]));
+
+    for (const row of rows) {
+      const investment = investmentsById.get(row.investmentId);
+      if (row.operation === "create" && (!investment || (investment.status === "closed" &&
+        (!investment.closedOn || input.asOfDate > investment.closedOn)))) {
+        throw new WorkflowError("investment_unavailable");
+      }
+      if (row.operation === "create" && existingByInvestment.has(row.investmentId)) {
+        throw new WorkflowError("mark_already_exists");
+      }
+      if (row.operation === "replace" && !existingByInvestment.has(row.investmentId)) {
+        throw new WorkflowError("mark_not_found");
+      }
     }
+
     const saved = [];
-    for (const row of input.rows) {
-      const command = { ...row, householdId: input.householdId, asOfDate: input.asOfDate };
-      saved.push(row.operation === "create"
-        ? await recordValuationMark(tx, command as WriteValuationMark)
-        : await replaceValuationMark(tx, command as ReplaceValuationMark));
+    for (const row of rows) {
+      if (row.operation === "create") {
+        const [mark] = await tx.insert(valuationMarks).values({
+          householdId: input.householdId, investmentId: row.investmentId, asOfDate: input.asOfDate,
+          grossValue: row.grossValue, debt: row.debt,
+          source: row.source, sourceReference: row.sourceReference, notes: row.notes,
+        }).returning();
+        saved.push(mark);
+      } else {
+        const [mark] = await tx.update(valuationMarks).set({
+          grossValue: row.grossValue, debt: row.debt,
+          source: row.source, sourceReference: row.sourceReference, notes: row.notes,
+        }).where(and(
+          eq(valuationMarks.householdId, input.householdId),
+          eq(valuationMarks.investmentId, row.investmentId),
+          eq(valuationMarks.asOfDate, input.asOfDate),
+        )).returning();
+        if (!mark) throw new WorkflowError("mark_not_found");
+        saved.push(mark);
+      }
     }
     return saved;
   });
@@ -246,14 +292,11 @@ export async function getEligibleInvestments(db: Database, householdId: string, 
 }
 
 export async function getLatestValuationMarks(db: Database, householdId: string) {
-  const rows = await db.select({ investmentId: valuationMarks.investmentId, id: valuationMarks.id,
+  return db.selectDistinctOn([valuationMarks.investmentId], { investmentId: valuationMarks.investmentId, id: valuationMarks.id,
     asOfDate: valuationMarks.asOfDate, grossValue: valuationMarks.grossValue, debt: valuationMarks.debt,
     source: valuationMarks.source, sourceReference: valuationMarks.sourceReference, notes: valuationMarks.notes,
   }).from(valuationMarks).where(eq(valuationMarks.householdId, householdId))
     .orderBy(asc(valuationMarks.investmentId), desc(valuationMarks.asOfDate));
-  const latest = new Map<string, (typeof rows)[number]>();
-  for (const row of rows) if (!latest.has(row.investmentId)) latest.set(row.investmentId, row);
-  return [...latest.values()];
 }
 
 export async function getValuationContext(db: Database, householdId: string, investmentId: string, asOfDate: string) {
@@ -261,14 +304,11 @@ export async function getValuationContext(db: Database, householdId: string, inv
     grossValue: valuationMarks.grossValue, debt: valuationMarks.debt, source: valuationMarks.source,
     sourceReference: valuationMarks.sourceReference, notes: valuationMarks.notes,
   }).from(valuationMarks).where(and(eq(valuationMarks.householdId, householdId),
-    eq(valuationMarks.investmentId, investmentId), lt(valuationMarks.asOfDate, asOfDate)))
-    .orderBy(desc(valuationMarks.asOfDate)).limit(1);
-  const [existing] = await db.select({ id: valuationMarks.id, asOfDate: valuationMarks.asOfDate,
-    grossValue: valuationMarks.grossValue, debt: valuationMarks.debt, source: valuationMarks.source,
-    sourceReference: valuationMarks.sourceReference, notes: valuationMarks.notes,
-  }).from(valuationMarks).where(and(eq(valuationMarks.householdId, householdId),
-    eq(valuationMarks.investmentId, investmentId), eq(valuationMarks.asOfDate, asOfDate)));
-  return { existing: existing ?? null, previous: rows[0] ?? null };
+    eq(valuationMarks.investmentId, investmentId), lte(valuationMarks.asOfDate, asOfDate)))
+    .orderBy(desc(valuationMarks.asOfDate)).limit(2);
+  const existing = rows[0]?.asOfDate === asOfDate ? rows[0] : null;
+  const previous = existing ? rows[1] : rows[0];
+  return { existing: existing ?? null, previous: previous ?? null };
 }
 
 export async function getInvestmentHistory(db: Database, householdId: string, investmentId: string) {
