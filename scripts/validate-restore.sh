@@ -29,13 +29,17 @@ if [[ $current_database != postgres ]]; then
 fi
 
 target="equinox_restore_$(date -u +%s)_${RANDOM}_${RANDOM}"
-target_url="${base%/*}/$target$query"
+if [[ -n "$query" && "$query" != '?' ]]; then
+  target_url="${base%/*}/$target$query&dbname=$target"
+else
+  target_url="${base%/*}/$target?dbname=$target"
+fi
 created=false
 cleanup() {
   exit_status=$?
   trap - EXIT
   if [[ $created == true ]]; then
-    if ! dropdb --maintenance-db="$maintenance_url" --if-exists "$target" >/dev/null 2>&1; then
+    if ! dropdb --maintenance-db="$maintenance_url" --force --if-exists "$target" >/dev/null 2>&1; then
       echo 'Could not remove the generated restore database; clean it up on the test server.' >&2
       exit_status=1
     fi
@@ -48,6 +52,14 @@ createdb --maintenance-db="$maintenance_url" "$target" || {
   exit 1
 }
 created=true
+target_database=$(psql --dbname="$target_url" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()') || {
+  echo 'Could not connect to the generated disposable restore database.' >&2
+  exit 1
+}
+if [[ $target_database != "$target" ]]; then
+  echo 'Generated restore URL did not select the disposable database.' >&2
+  exit 1
+fi
 pg_restore --exit-on-error --no-owner --no-privileges --dbname="$target_url" "$dump" >/dev/null || {
   echo 'Restore into the disposable database failed.' >&2
   exit 1

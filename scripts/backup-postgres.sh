@@ -13,17 +13,27 @@ if [[ ! -d "$backup_dir" || ! -w "$backup_dir" ]]; then
   exit 1
 fi
 
-lock_dir="$backup_dir/.equinox-backup.lock"
-if ! mkdir "$lock_dir" 2>/dev/null; then
-  echo 'Another backup is running, or a stale backup lock needs inspection.' >&2
-  exit 1
-fi
+lock_file="$backup_dir/.equinox-backup.lock"
+lock_token=''
 temporary=''
 cleanup() {
   if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; fi
-  rmdir -- "$lock_dir"
+  if [[ -n "$lock_token" ]]; then
+    if [[ -e "$lock_file" && "$lock_file" -ef "$lock_token" ]]; then
+      rm -f -- "$lock_file"
+    fi
+    rm -f -- "$lock_token"
+  fi
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+lock_token=$(mktemp "$backup_dir/.equinox-lock.XXXXXXXX.tmp")
+if ! ln -- "$lock_token" "$lock_file" 2>/dev/null; then
+  echo 'Another backup is running, or a stale backup lock needs inspection.' >&2
+  exit 1
+fi
 
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 final="$backup_dir/equinox-$stamp.dump"
