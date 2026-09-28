@@ -8,6 +8,7 @@ describe("entry form semantics", () => {
     const html = renderToStaticMarkup(createElement(EntryForm, { kind: "transfer" }));
     expect(html).toContain("Move value from");
     expect(html).toContain("Move value to");
+    expect(html).toContain('<select id="sourceInvestmentId"');
     expect(html).toContain("Amount to move");
     expect(html).toContain("one linked transfer");
     expect(html).not.toContain("Withdrawal / Distribution");

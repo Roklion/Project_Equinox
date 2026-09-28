@@ -198,7 +198,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       </div>
       {kind === "transfer" ? (
         <div className="transfer-pair">
-          <InvestmentSelect id="investmentId" label="Move value from" value={investmentId}
+          <InvestmentSelect id="sourceInvestmentId" label="Move value from" value={investmentId}
             onChange={(value) => {
               setInvestmentId(value);
               if (value === destinationInvestmentId) setDestinationInvestmentId("");
