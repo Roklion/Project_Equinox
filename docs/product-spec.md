@@ -42,6 +42,8 @@ The MVP does not provide security-level transaction accounting, tax lots, realiz
 - Metrics for groups and portfolios are recomputed from their underlying events and valuations according to [the metric definitions](metrics.md).
 - The interface distinguishes investment net value from household net worth; Equinox may initially track only the investment portion needed to compute the former.
 - Mobile and desktop may compose the same domain components differently to suit touch and available space.
+- Output and visualization surfaces follow the consumer-finance visual direction in [the design system](design-system.md): value-first, calm, spacious, and Monarch-inspired without copying another product's branding or exact screens.
+- Value-over-time and composition-over-time are distinct product questions: use a simple value trend for "how much" and a stacked composition view for "what it is made of" across investment/classification groupings.
 
 ## Success criteria
 
