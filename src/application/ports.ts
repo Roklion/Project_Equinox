@@ -37,7 +37,11 @@ export type ValuationBatchRow =
   | ({ operation: "create" } & Omit<WriteValuationMark, "householdId" | "asOfDate">)
   | ({ operation: "replace" } & Omit<ReplaceValuationMark, "householdId" | "asOfDate">);
 export type SaveValuationBatch = { householdId: HouseholdId; asOfDate: string; rows: ValuationBatchRow[] };
-export type InvestmentOption = { id: InvestmentId; name: string; status: "active" | "closed"; closedOn: string | null };
+export type InvestmentOption = {
+  id: InvestmentId; name: string; status: "active" | "closed"; closedOn: string | null;
+  assetClass: string | null; accountType: string | null; taxStatus: string | null;
+  liquidity: string | null; institution: string | null;
+};
 
 export type StoredMovement = {
   actionId: string; kind: ActionKind; effectiveDate: string;

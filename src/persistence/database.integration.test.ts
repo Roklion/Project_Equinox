@@ -8,7 +8,7 @@ import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
 import { createInvestment, closeInvestment, createPostgresPortfolioRepository, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
-import { actions, assetClasses, households, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
+import { actions, assetClasses, households, institutions, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
 vi.mock("server-only", () => ({}));
@@ -246,8 +246,11 @@ describe("PostgreSQL persistence", () => {
     const service = createPortfolioService(createPostgresPortfolioRepository(db));
     const [home] = await db.insert(households).values({ name: "Batch valuation" }).returning();
     const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
-    const a = await service.createInvestment({ householdId: home.id, name: "A", ownerIds: [owner.id] });
-    const b = await service.createInvestment({ householdId: home.id, name: "B", ownerIds: [owner.id] });
+    const [assetClass] = await db.insert(assetClasses).values({ householdId: home.id, label: "Example class" }).returning();
+    const [institution] = await db.insert(institutions).values({ householdId: home.id, label: "Example institution" }).returning();
+    const a = await service.createInvestment({ householdId: home.id, name: "Same name", ownerIds: [owner.id],
+      assetClassId: assetClass.id, institutionId: institution.id });
+    const b = await service.createInvestment({ householdId: home.id, name: "Same name", ownerIds: [owner.id] });
     const c = await service.createInvestment({ householdId: home.id, name: "C", ownerIds: [owner.id] });
     const old = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
       asOfDate: "2026-07-01", grossValue: "20", debt: "25" });
@@ -281,8 +284,13 @@ describe("PostgreSQL persistence", () => {
     const context = await service.previewValuationDelta(home.id, b.id, "2026-07-02", "25", "40");
     expect(context).toMatchObject({ previous: { id: old.id, netValue: "5.00" },
       enteredNetValue: "-15.00", enteredDelta: "-20.00" });
-    expect(await service.getEligibleInvestments(home.id, "2026-07-02"))
-      .toEqual(expect.not.arrayContaining([expect.objectContaining({ id: c.id })]));
+    const eligible = await service.getEligibleInvestments(home.id, "2026-07-02");
+    expect(eligible.map(({ id }) => id)).toEqual([a.id, b.id].sort());
+    expect(eligible).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: a.id, assetClass: "Example class", institution: "Example institution" }),
+      expect.objectContaining({ id: b.id, assetClass: null, institution: null }),
+    ]));
+    expect(eligible).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: c.id })]));
     await service.deleteValuationMark(home.id, a.id, "2026-07-01");
     await expect(service.deleteValuationMark(home.id, a.id, "2026-07-01"))
       .rejects.toMatchObject({ code: "mark_not_found" });

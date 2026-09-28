@@ -5,7 +5,7 @@ import { WorkflowError } from "@/application/errors";
 import type { EditExternalAction, EditTransfer, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement, WriteValuationMark } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
-  actions, investmentOwners, investments, movements, valuationMarks,
+  accountTypes, actions, assetClasses, institutions, investmentOwners, investments, liquidities, movements, taxStatuses, valuationMarks,
 } from "./schema";
 
 type PoolDatabase = ReturnType<typeof createDatabase>["db"];
@@ -230,11 +230,19 @@ export async function saveValuationBatch(db: Database, input: SaveValuationBatch
 
 export async function getEligibleInvestments(db: Database, householdId: string, asOfDate: string) {
   return db.select({ id: investments.id, name: investments.name, status: investments.status,
-    closedOn: investments.closedOn }).from(investments).where(and(eq(investments.householdId, householdId),
+    closedOn: investments.closedOn, assetClass: assetClasses.label, accountType: accountTypes.label,
+    taxStatus: taxStatuses.label, liquidity: liquidities.label, institution: institutions.label,
+  }).from(investments)
+    .leftJoin(assetClasses, and(eq(assetClasses.householdId, investments.householdId), eq(assetClasses.id, investments.assetClassId)))
+    .leftJoin(accountTypes, and(eq(accountTypes.householdId, investments.householdId), eq(accountTypes.id, investments.accountTypeId)))
+    .leftJoin(taxStatuses, and(eq(taxStatuses.householdId, investments.householdId), eq(taxStatuses.id, investments.taxStatusId)))
+    .leftJoin(liquidities, and(eq(liquidities.householdId, investments.householdId), eq(liquidities.id, investments.liquidityId)))
+    .leftJoin(institutions, and(eq(institutions.householdId, investments.householdId), eq(institutions.id, investments.institutionId)))
+    .where(and(eq(investments.householdId, householdId),
     or(eq(investments.status, "active"), and(eq(investments.status, "closed"),
       // A historical date on/before closure is eligible for new dated activity.
       // SQL date comparison preserves calendar-day semantics.
-      gte(investments.closedOn, asOfDate))))).orderBy(asc(investments.name));
+      gte(investments.closedOn, asOfDate))))).orderBy(asc(investments.name), asc(investments.id));
 }
 
 export async function getLatestValuationMarks(db: Database, householdId: string) {
