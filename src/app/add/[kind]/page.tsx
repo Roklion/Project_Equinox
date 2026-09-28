@@ -11,7 +11,7 @@ const labels = {
 
 export default async function EntryPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params;
-  if (!(kind in labels)) notFound();
+  if (!Object.hasOwn(labels, kind)) notFound();
   const entryKind = kind as keyof typeof labels;
   return (
     <>
