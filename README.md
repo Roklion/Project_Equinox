@@ -45,6 +45,7 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 | `npm run db:down` | Stop local PostgreSQL, retaining its data volume |
 | `npm run db:generate -- --name=description` | Generate versioned SQL and snapshots from the Drizzle schema |
 | `npm run db:migrate` | Apply pending committed migrations to `DATABASE_URL` |
+| `npm run db:seed` | Seed an empty local database with the synthetic demo portfolio; safe to repeat |
 | `npm run db:verify` | Exercise a server-side synthetic PostgreSQL write/read in a temporary table |
 | `npm run db:reset` | **Delete the Compose database volume**, restart, and apply migrations |
 | `npm run test:db` | Test migrations and connections in a newly created disposable database |
@@ -72,6 +73,8 @@ npm run db:migrate
 The baseline records migration history; authentication migrations create failed-login throttling and session tables without introducing financial domain tables. Stop with `npm run db:down`; data survives. The password initializes a new volume, so changing the environment file does not change an existing database password.
 
 For an intentional **destructive rebuild of disposable local data**, run `npm run db:reset`. It removes the `equinox-local` Compose volume, starts a fresh database, and reapplies migrations. Verify `DATABASE_URL` points to this local database before running it. Do not use this workflow for shared or production data.
+
+To populate that fresh local database with invented development records, run `npm run db:seed` after migrations. The command accepts only a loopback PostgreSQL host and an empty household database. A second run reports that the demo portfolio already exists. To rebuild disposable local data and seed again, run `npm run db:reset` followed by `npm run db:seed`. The seed includes example owners, classifications, five investment styles, a linked transfer, debt and negative equity, and a closed investment with retained history. It never runs automatically in production.
 
 An existing standard PostgreSQL service is also supported: set `DATABASE_URL` to that database and run `npm run db:migrate`. Docker is only a development convenience, not a runtime/provider dependency. Configure hosted TLS requirements in the connection URL; certificate verification is not disabled by the adapter.
 

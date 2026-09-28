@@ -7,8 +7,9 @@ import {
   actions, investmentOwners, investments, movements, valuationMarks,
 } from "./schema";
 
-type Database = ReturnType<typeof createDatabase>["db"];
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type PoolDatabase = ReturnType<typeof createDatabase>["db"];
+type Transaction = Parameters<Parameters<PoolDatabase["transaction"]>[0]>[0];
+type Database = PoolDatabase | Transaction;
 
 function exactAmount(value: string, allowZero = false): string {
   return formatCents(parseCents(value, allowZero));
