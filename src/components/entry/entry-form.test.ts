@@ -19,7 +19,7 @@ describe("entry form semantics", () => {
     expect(html).toContain("Gross investment value");
     expect(html).toContain("Investment-linked debt");
     const debtInput = html.match(/<input[^>]*id="debt"[^>]*>/)?.[0];
-    expect(debtInput).toContain('value="0"');
+    expect(debtInput).toContain('value=""');
     expect(debtInput).not.toContain("required");
     expect(html).toContain("Leave blank to use zero.");
     expect(html).toContain("Save valuation mark");

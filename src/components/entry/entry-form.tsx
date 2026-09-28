@@ -68,7 +68,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [destinationInvestmentId, setDestinationInvestmentId] = useState("");
   const [amount, setAmount] = useState("");
   const [grossValue, setGrossValue] = useState("");
-  const [debt, setDebt] = useState("0");
+  const [debt, setDebt] = useState("");
   const [notes, setNotes] = useState("");
   const [sourceReference, setSourceReference] = useState("");
   const [investments, setInvestments] = useState<InvestmentOption[]>([]);
@@ -166,7 +166,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <p>Your entry is recorded for {date}. You can add another entry or return to the overview.</p>
         <div className="entry-actions">
           <button type="button" className="primary-button" onClick={() => {
-            setSaved(false); setAmount(""); setGrossValue(""); setDebt("0");
+            setSaved(false); setAmount(""); setGrossValue(""); setDebt("");
             setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({});
             setLoadError(""); setSaveError("");
             if (kind === "valuation") {
@@ -293,7 +293,10 @@ export function EntryForm({ kind }: { kind: Kind }) {
       </details>
       {(saveError || loadError) && <p role="alert" className="form-error">{saveError || loadError}</p>}
       <div className="entry-actions">
-        <button className="primary-button" type="submit" disabled={busy || loading || investments.length === 0}>
+        {loadError && <button className="primary-button" type="button" onClick={() => {
+          setLoadError(""); setLoading(true); setRefresh((current) => current + 1);
+        }}>Try loading again</button>}
+        <button className="primary-button" type="submit" disabled={busy || loading || Boolean(loadError) || investments.length === 0}>
           {busy ? "Saving…" : kind === "valuation" && context?.existing ? "Correct existing mark" :
             kind === "transfer" ? "Save transfer" : kind === "valuation" ? "Save valuation mark" :
               kind === "contribution" ? "Save contribution" : "Save withdrawal"}

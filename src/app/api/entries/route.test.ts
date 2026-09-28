@@ -115,6 +115,14 @@ describe("entry route", () => {
     expect(service.replaceValuationMark).not.toHaveBeenCalled();
   });
 
+  it("returns a form error for workflow failures with no field mapping", async () => {
+    service.recordValuationMark.mockRejectedValueOnce(new WorkflowError("empty_correction"));
+    const response = await POST(post({ kind: "valuation", investmentId: "investment-a",
+      date: "2026-09-28", grossValue: "10.00", debt: "25.00", operation: "create" }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ formError: "Unable to save this entry. Please try again." });
+  });
+
   it("returns selected-date context and latest mark for an eligible investment", async () => {
     service.getValuationContext.mockResolvedValueOnce({
       existing: { asOfDate: "2026-09-28", grossValue: "10.00", debt: "25.00", netValue: "-15.00" },

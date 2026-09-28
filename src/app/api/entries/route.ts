@@ -121,7 +121,11 @@ export async function POST(request: NextRequest) {
       ? NextResponse.json({ ok: true })
       : NextResponse.json({ formError: "Add a household and investment before recording an entry." }, { status: 409 });
   } catch (error) {
-    if (error instanceof WorkflowError) return NextResponse.json({ fieldErrors: failure(error.code) }, { status: 409 });
+    if (error instanceof WorkflowError) {
+      const fieldErrors = failure(error.code);
+      if (Object.keys(fieldErrors).length > 0) return NextResponse.json({ fieldErrors }, { status: 409 });
+      return NextResponse.json({ formError: "Unable to save this entry. Please try again." }, { status: 409 });
+    }
     return NextResponse.json({ formError: "Unable to save this entry. Please try again." }, { status: 503 });
   }
 }
