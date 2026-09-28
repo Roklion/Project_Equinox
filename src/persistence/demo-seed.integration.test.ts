@@ -58,6 +58,10 @@ it("seeds a complete synthetic portfolio once through canonical writes", async (
     (select count(*) from valuation_marks) as marks`);
   expect(after.rows).toEqual(before.rows);
 
+  const [additionalHousehold] = await db.insert(households).values({ name: "Another sample household" }).returning();
+  await expect(seedDemoPortfolio(db)).rejects.toThrow("empty household database");
+  await db.delete(households).where(eq(households.id, additionalHousehold.id));
+
   const [household] = await db.select().from(households);
   expect(household.name).toBe("Example Household");
   const allInvestments = await db.select().from(investments);

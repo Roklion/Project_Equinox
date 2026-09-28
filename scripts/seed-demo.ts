@@ -1,6 +1,7 @@
 import nextEnv from "@next/env";
 import { createDatabase } from "../src/persistence/database";
 import { readDatabaseUrl } from "../src/persistence/environment";
+import { assertLoopbackDatabaseUrl } from "../src/persistence/demo-seed-config";
 import { seedDemoPortfolio } from "../src/persistence/demo-seed";
 
 nextEnv.loadEnvConfig(process.cwd(), true);
@@ -8,10 +9,7 @@ nextEnv.loadEnvConfig(process.cwd(), true);
 async function main() {
   if (process.env.NODE_ENV === "production") throw new Error("Demo seed is disabled in production.");
   const connectionString = readDatabaseUrl();
-  const url = new URL(connectionString);
-  if (!["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
-    throw new Error("Demo seed requires a loopback PostgreSQL host.");
-  }
+  assertLoopbackDatabaseUrl(connectionString);
   const { db, pool } = createDatabase(connectionString);
   try {
     const result = await seedDemoPortfolio(db);
@@ -21,7 +19,8 @@ async function main() {
   }
 }
 
-main().catch(() => {
+main().catch((error: unknown) => {
   console.error("Demo seed failed. Check that the local database is migrated and contains no other household data.");
+  console.error(error instanceof Error ? error.message : "Unknown seed error.");
   process.exitCode = 1;
 });

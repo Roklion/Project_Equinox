@@ -15,8 +15,10 @@ const demoHouseholdId = "00000000-0000-4000-8000-000000000013";
 export async function seedDemoPortfolio(db: Database): Promise<"created" | "already-seeded"> {
   return db.transaction(async (tx) => {
     const existing = await tx.select({ id: households.id }).from(households);
-    if (existing.some(({ id }) => id === demoHouseholdId)) return "already-seeded";
-    if (existing.length) throw new Error("Demo seed requires an empty household database.");
+    if (existing.length > 0) {
+      if (existing.length === 1 && existing[0].id === demoHouseholdId) return "already-seeded";
+      throw new Error("Demo seed requires an empty household database.");
+    }
 
     await tx.insert(households).values({ id: demoHouseholdId, name: "Example Household" });
     const [alex, blair] = await tx.insert(owners).values([
