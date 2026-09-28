@@ -41,7 +41,7 @@ A dated economic event affecting an investment. The canonical user-entered actio
 - **Transfer:** value moving between two investments within the household boundary.
 - **Valuation Mark:** an observation of gross value and, where applicable, investment-linked debt as of a date.
 
-No audit-log or change-history subsystem is required in EPIC 1. Existing valuation marks may be corrected explicitly in place while retaining their investment/date identity; the application does not silently replace a mark when recording a new one. User-facing edit and deletion rules for other records belong to later workflows. Closing an investment must still retain its economic history.
+The MVP has no audit/change-history subsystem. Explicit correction updates the canonical record in place. A contribution or withdrawal can be edited or deleted as one action; its single movement changes with it. A transfer can be edited or deleted only as one logical action, preserving both linked movements. A valuation mark can be explicitly replaced in place for the same investment/date or deleted. Creating a same-date mark never silently replaces one. Presentation must confirm explicit deletion. Closing an investment retains its economic history until a user explicitly corrects or deletes a historical record.
 
 ## Transfer representation
 
@@ -57,11 +57,11 @@ Every valuation mark has an as-of date and identifies its investment. A mark rec
 
 Debt may exceed gross value; negative net investment value is valid. A mark is an observation, not a cash flow.
 
-The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. An explicit replacement operation updates an existing mark on that date in place, including a historical mark on a closed investment. It fails if no mark exists; no silent insert or overwrite occurs.
+The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. An explicit replacement operation updates an existing mark on that date in place, including a historical mark on a closed investment. It fails if no mark exists; no silent insert or overwrite occurs. A batch valuation save uses one shared as-of date, omits untouched rows, and identifies each entered row as creation or replacement. All rows are validated before writing and the batch commits atomically.
 
 ## Lifecycle
 
-An investment can be active or closed. Closing stops ordinary forward data entry but does not delete actions, marks, classifications, or historical participation in portfolio calculations. Reopening behavior and deletion policy remain future product decisions.
+An investment can be active or closed. Closing stops ordinary forward data entry after the close date but does not delete actions, marks, classifications, or historical participation in portfolio calculations. Historical actions and marks on or before the close date may be entered or explicitly corrected. Reopening behavior remains a future product decision.
 
 ## Invariants
 
@@ -79,4 +79,4 @@ An investment can be active or closed. Closing stops ordinary forward data entry
 
 MVP financial values are USD with exact cent precision. Financial/economic dates are daily calendar dates, not timestamps. Operational metadata may use UTC timestamps but cannot supply or replace an economic effective date. Storage and adapter conventions are owned by [architecture](architecture.md#data-integrity).
 
-Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The application service accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Valuation selection between dates, calculated/display rounding, and user-facing correction/deletion rules remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP; an audit subsystem is outside EPIC 1.
+Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The application service accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Contribution, withdrawal, and transfer inputs are positive magnitudes; the selected action type owns direction. Gross value and linked debt inputs are nonnegative; derived net value can be negative. Valuation selection between dates and calculated/display rounding remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP.

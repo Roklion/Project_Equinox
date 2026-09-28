@@ -7,9 +7,18 @@ function fakeRepository() {
     createInvestment: vi.fn(async () => ({ id: "investment-a" })),
     closeInvestment: vi.fn(async () => ({ id: "investment-a" })),
     recordExternalAction: vi.fn(async () => ({ id: "action-a" })),
+    editExternalAction: vi.fn(async () => ({ id: "action-a" })),
+    deleteExternalAction: vi.fn(async () => {}),
     recordTransfer: vi.fn(async () => ({ id: "action-b" })),
+    editTransfer: vi.fn(async () => ({ id: "action-b" })),
+    deleteTransfer: vi.fn(async () => {}),
     recordValuationMark: vi.fn(async () => ({ id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "0.00" })),
     replaceValuationMark: vi.fn(async () => ({ id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "2.00" })),
+    deleteValuationMark: vi.fn(async () => {}),
+    saveValuationBatch: vi.fn(async () => []),
+    getEligibleInvestments: vi.fn(async () => []),
+    getLatestValuationMarks: vi.fn(async () => []),
+    getValuationContext: vi.fn(async () => ({ existing: null, previous: null })),
     getInvestmentHistory: vi.fn(async () => ({ movements: [], marks: [
       { id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "2.00" },
     ] })),
@@ -72,5 +81,27 @@ describe("portfolio application service", () => {
     expect(repository.replaceValuationMark).toHaveBeenCalledWith(expect.objectContaining({
       source: null, sourceReference: null, notes: null,
     }));
+  });
+
+  it("validates corrections and the whole batch before calling persistence", async () => {
+    const repository = fakeRepository();
+    const service = createPortfolioService(repository);
+    expect(() => service.editExternalAction({ householdId: "home", actionId: "a", investmentId: "i",
+      kind: "withdrawal", effectiveDate: "2026-02-30", amount: "1" })).toThrowError(expect.objectContaining({ code: "invalid_date" }));
+    expect(() => service.editTransfer({ householdId: "home", actionId: "t", sourceInvestmentId: "i",
+      destinationInvestmentId: "i", effectiveDate: "2026-03-01", amount: "1" })).toThrowError(expect.objectContaining({ code: "invalid_transfer" }));
+    expect(() => service.saveValuationBatch({ householdId: "home", asOfDate: "2026-03-01", rows: [
+      { operation: "create", investmentId: "a", grossValue: "1" },
+      { operation: "create", investmentId: "b", grossValue: "1.001" },
+    ] })).toThrowError(expect.objectContaining({ code: "invalid_money" }));
+    expect(repository.saveValuationBatch).not.toHaveBeenCalled();
+    await service.saveValuationBatch({ householdId: "home", asOfDate: "2026-03-01", rows: [
+      { operation: "create", investmentId: "a", grossValue: "1" },
+      { operation: "replace", investmentId: "b", debt: "2" },
+    ] });
+    expect(repository.saveValuationBatch).toHaveBeenCalledWith({ householdId: "home", asOfDate: "2026-03-01", rows: [
+      expect.objectContaining({ operation: "create", investmentId: "a", grossValue: "1.00", debt: "0.00" }),
+      expect.objectContaining({ operation: "replace", investmentId: "b", debt: "2.00" }),
+    ] });
   });
 });

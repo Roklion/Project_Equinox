@@ -7,7 +7,7 @@ import { createPortfolioService } from "@/application/portfolio";
 import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
-import { createInvestment, closeInvestment, createPostgresPortfolioRepository, recordExternalAction, recordTransfer, recordValuationMark } from "@/persistence/records";
+import { createInvestment, closeInvestment, createPostgresPortfolioRepository, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
 import { actions, assetClasses, households, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
@@ -194,5 +194,97 @@ describe("PostgreSQL persistence", () => {
       asOfDate: "2026-04-01", grossValue: "1.00" })).rejects.toThrow();
     await expect(service.replaceValuationMark({ householdId: home.id, investmentId: investment.id,
       asOfDate: "2026-04-02", grossValue: "1.00" })).rejects.toThrow();
+  });
+
+  it("edits and deletes external actions and whole transfers without orphan legs", async () => {
+    const { db } = connection!;
+    const service = createPortfolioService(createPostgresPortfolioRepository(db));
+    const [home] = await db.insert(households).values({ name: "Workflow actions" }).returning();
+    const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
+    const a = await service.createInvestment({ householdId: home.id, name: "A", ownerIds: [owner.id] });
+    const b = await service.createInvestment({ householdId: home.id, name: "B", ownerIds: [owner.id] });
+    const c = await service.createInvestment({ householdId: home.id, name: "C", ownerIds: [owner.id] });
+    const external = await service.recordExternalAction({ householdId: home.id, investmentId: a.id,
+      kind: "contribution", effectiveDate: "2026-06-01", amount: "10", notes: "Synthetic original" });
+    await service.editExternalAction({ householdId: home.id, actionId: external.id, investmentId: b.id,
+      kind: "withdrawal", effectiveDate: "2026-06-02", amount: "4.50", notes: "Synthetic correction" });
+    expect((await service.getInvestmentHistory(home.id, a.id)).movements).toHaveLength(0);
+    expect((await service.getInvestmentHistory(home.id, b.id)).movements).toEqual([
+      expect.objectContaining({ actionId: external.id, kind: "withdrawal", direction: "out", amount: "4.50" }),
+    ]);
+    const transfer = await service.recordTransfer({ householdId: home.id, sourceInvestmentId: a.id,
+      destinationInvestmentId: b.id, effectiveDate: "2026-06-03", amount: "3" });
+    await service.editTransfer({ householdId: home.id, actionId: transfer.id, sourceInvestmentId: b.id,
+      destinationInvestmentId: c.id, effectiveDate: "2026-06-04", amount: "5" });
+    expect(await db.select({ investmentId: movements.investmentId, direction: movements.direction, amount: movements.amount })
+      .from(movements).where(eq(movements.actionId, transfer.id)).orderBy(asc(movements.role))).toEqual([
+      { investmentId: c.id, direction: "in", amount: "5.00" },
+      { investmentId: b.id, direction: "out", amount: "5.00" },
+    ]);
+    expect((await service.getInvestmentHistory(home.id, b.id)).movements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ actionId: transfer.id, counterpartyInvestmentId: c.id }),
+    ]));
+    await service.closeInvestment(home.id, b.id, "2026-06-04");
+    await service.editExternalAction({ householdId: home.id, actionId: external.id, investmentId: b.id,
+      kind: "withdrawal", effectiveDate: "2026-06-02", amount: "4", notes: null });
+    expect((await service.getInvestmentHistory(home.id, b.id)).movements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ actionId: external.id, notes: null }),
+    ]));
+    await expect(service.editTransfer({ householdId: home.id, actionId: transfer.id, sourceInvestmentId: b.id,
+      destinationInvestmentId: c.id, effectiveDate: "2026-06-05", amount: "5" }))
+      .rejects.toMatchObject({ code: "investment_unavailable" });
+    expect((await db.select().from(movements).where(eq(movements.actionId, transfer.id)))).toHaveLength(2);
+    await service.deleteExternalAction(home.id, external.id);
+    await service.deleteTransfer(home.id, transfer.id);
+    expect(await db.select().from(actions).where(eq(actions.householdId, home.id))).toHaveLength(0);
+    expect(await db.select().from(movements).where(eq(movements.householdId, home.id))).toHaveLength(0);
+    await expect(service.deleteTransfer(home.id, transfer.id)).rejects.toMatchObject({ code: "action_not_found" });
+  });
+
+  it("validates a batch before writes and rolls back a failed write", async () => {
+    const { db } = connection!;
+    const service = createPortfolioService(createPostgresPortfolioRepository(db));
+    const [home] = await db.insert(households).values({ name: "Batch valuation" }).returning();
+    const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
+    const a = await service.createInvestment({ householdId: home.id, name: "A", ownerIds: [owner.id] });
+    const b = await service.createInvestment({ householdId: home.id, name: "B", ownerIds: [owner.id] });
+    const c = await service.createInvestment({ householdId: home.id, name: "C", ownerIds: [owner.id] });
+    const old = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
+      asOfDate: "2026-07-01", grossValue: "20", debt: "25" });
+    await service.closeInvestment(home.id, c.id, "2026-07-01");
+    await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-02", rows: [
+      { operation: "create", investmentId: a.id, grossValue: "10" },
+      { operation: "create", investmentId: c.id, grossValue: "10" },
+    ] })).rejects.toMatchObject({ code: "investment_unavailable" });
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, a.id))).toHaveLength(0);
+    await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-01", rows: [
+      { operation: "create", investmentId: a.id, grossValue: "10" },
+      { operation: "create", investmentId: b.id, grossValue: "30" },
+    ] })).rejects.toMatchObject({ code: "mark_already_exists" });
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, a.id))).toHaveLength(0);
+    await expect(saveValuationBatch(db, { householdId: home.id, asOfDate: "2026-07-01", rows: [
+      { operation: "create", investmentId: a.id, grossValue: "10" },
+      { operation: "create", investmentId: c.id, grossValue: "10000000000000000" },
+    ] })).rejects.toThrow();
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, a.id))).toHaveLength(0);
+    const saved = await service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-01", rows: [
+      { operation: "create", investmentId: a.id, grossValue: "10", debt: "12" },
+      { operation: "replace", investmentId: b.id, grossValue: "30" },
+    ] });
+    expect(saved).toHaveLength(2);
+    expect(saved[1].id).toBe(old.id);
+    const latest = await service.getLatestValuationMarks(home.id);
+    expect(latest).toEqual(expect.arrayContaining([
+      expect.objectContaining({ investmentId: a.id, netValue: "-2.00" }),
+      expect.objectContaining({ investmentId: b.id, netValue: "5.00" }),
+    ]));
+    const context = await service.previewValuationDelta(home.id, b.id, "2026-07-02", "25", "40");
+    expect(context).toMatchObject({ previous: { id: old.id, netValue: "5.00" },
+      enteredNetValue: "-15.00", enteredDelta: "-20.00" });
+    expect(await service.getEligibleInvestments(home.id, "2026-07-02"))
+      .toEqual(expect.not.arrayContaining([expect.objectContaining({ id: c.id })]));
+    await service.deleteValuationMark(home.id, a.id, "2026-07-01");
+    await expect(service.deleteValuationMark(home.id, a.id, "2026-07-01"))
+      .rejects.toMatchObject({ code: "mark_not_found" });
   });
 });
