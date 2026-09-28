@@ -117,11 +117,10 @@ export async function POST(request: NextRequest) {
       if (kind === "valuation") {
         const investmentId = text(input, "investmentId");
         const operation = text(input, "operation");
-        const existing = operation === "replace"
-          ? (await service.getValuationContext(householdId, investmentId, date)).existing
-          : null;
+        const debtInput = text(input, "debt");
         const mark = { householdId, investmentId, asOfDate: date,
-          grossValue: text(input, "grossValue"), debt: valuationDebt(input, existing?.debt ?? "0"), ...provenance };
+          grossValue: text(input, "grossValue"), debt: debtInput || (operation === "create" ? "0" : undefined),
+          ...provenance };
         return operation === "replace"
           ? service.replaceValuationMark(mark) : service.recordValuationMark(mark);
       }
