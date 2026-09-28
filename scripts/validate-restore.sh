@@ -15,7 +15,7 @@ pg_restore --list "$dump" >/dev/null || { echo 'Selected dump is invalid.' >&2; 
 maintenance_url=$TEST_DATABASE_URL
 base=${maintenance_url%%\?*}
 query=${maintenance_url#"$base"}
-if [[ ! $base =~ ^postgres(ql)?://.+/postgres$ ]]; then
+if [[ ! $base =~ ^postgres(ql)?://[^/]*/postgres$ ]]; then
   echo 'TEST_DATABASE_URL must name the postgres maintenance database.' >&2
   exit 1
 fi
