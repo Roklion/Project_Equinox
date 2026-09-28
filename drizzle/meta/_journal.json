@@ -22,6 +22,20 @@
       "when": 1790481544775,
       "tag": "0002_auth_sessions",
       "breakpoints": true
+    },
+    {
+      "tag": "0003_investment_model",
+      "version": "7",
+      "idx": 3,
+      "when": 1790525408351,
+      "breakpoints": true
+    },
+    {
+      "tag": "0004_movement_history_index",
+      "version": "7",
+      "idx": 4,
+      "when": 1790525408352,
+      "breakpoints": true
     }
   ]
 }

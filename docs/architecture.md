@@ -39,7 +39,7 @@ The initial scaffold uses these homes:
 | Framework-independent types and financial rules | `src/domain` |
 | Database access, transactions, and migrations | `src/persistence` |
 
-Dependency direction is presentation → application → domain. Persistence is an adapter used by application workflows. Domain code must not depend on Next.js, React, or persistence. ESLint guards imports from the initial higher-level folders; it is a lightweight guardrail, not a substitute for keeping future dependencies within these boundaries. Application workflows remain future work; persistence now provides a PostgreSQL connection factory and migration runner without domain tables.
+Dependency direction is presentation → application → domain. Persistence implements application-owned repository ports; the application service does not import the PostgreSQL adapter. Domain code does not depend on Next.js, React, or persistence. ESLint guards imports from higher-level folders. The EPIC 1 application service provides only creation, lifecycle, recording, explicit valuation correction, and history queries; full user-facing workflows remain later work.
 
 Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. The hosted topology uses Vercel for Next.js and Neon Free for PostgreSQL; [hosted deployment](hosted-deployment.md) owns operational instructions.
 
@@ -57,11 +57,11 @@ Never import secrets into domain or client components. The database adapter is m
 
 Use Drizzle ORM with the standard `pg` (node-postgres) driver. `src/persistence/database.ts` creates a small connection pool and a typed Drizzle database; the caller owns pool reuse and shutdown. Connections are lazy, so importing the adapter does not contact a database. The migration CLI reports the underlying error message and code when available; invalid connection URL errors omit the supplied value. The idle-pool handler logs a generic message rather than the driver error. The adapter passes the connection URL's TLS options to `pg` without overriding certificate verification. Hosted-provider SDKs are not required.
 
-`src/persistence/schema.ts` is the future domain-schema owner. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The initial custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. Subsequent schema tickets generate real DDL from the schema owner.
+`src/persistence/schema.ts` defines the financial domain tables and operational authentication tables; authentication state remains separate from the domain model. Drizzle Kit generates versioned SQL and snapshots in `drizzle/`. Commit the SQL, snapshots, and journal together. The custom baseline migration runs `SELECT 1` and establishes Drizzle's journal without inventing an application table. Authentication migrations create failed-login and session storage first; `0003_investment_model` introduces canonical economic records and deferred PostgreSQL checks for required owners and complete action legs, and `0004_movement_history_index` adds the history-query index.
 
 `npm run db:migrate` and integration tests share `src/persistence/migrate.ts`, which delegates migration tracking and transactions to Drizzle. Run migrations as an explicit deployment step; do not run them on page requests or use schema push in production/shared environments. Already-applied migrations are immutable: make corrections in a new migration. No schema-push script is provided.
 
-`npm run db:verify` reuses the same server-only database adapter and performs a synthetic insert and select in a session-local temporary table that PostgreSQL drops at commit. It is an operational connectivity check, not an application investment workflow or a demo seed. No domain tables exist yet. Neon configuration in `neon.ts` is limited to branch policy; application SQL, migration files, and the driver use standard PostgreSQL interfaces.
+`npm run db:verify` reuses the same server-only database adapter and performs a synthetic insert and select in a session-local temporary table that PostgreSQL drops at commit. It is an operational connectivity check, not an application investment workflow or a demo seed, and does not exercise the financial domain tables. Neon configuration in `neon.ts` is limited to branch policy; application SQL, migration files, and the driver use standard PostgreSQL interfaces.
 
 Docker Compose provides standard PostgreSQL 18.4, bound to loopback port 5433 with a Docker-managed named volume. No database files belong in the repository. An existing standard PostgreSQL service can use the same adapter and migration commands through `DATABASE_URL`. See [database setup](../README.md#local-postgresql) for startup and destructive local rebuild commands.
 
@@ -69,14 +69,18 @@ Database integration tests require a separate `TEST_DATABASE_URL` with permissio
 
 ## Data integrity
 
-- MVP financial currency is USD only. Persist monetary values with exact cent precision, using PostgreSQL exact numeric or integer-cent types rather than binary floating point. Choose column capacity with the domain schema; retain exact strings or integer cents at the driver boundary.
+- MVP financial currency is USD only. Persist monetary values as `numeric(18, 2)` and retain exact strings or integer cents at the driver boundary. The recording adapter rejects more than two fractional digits rather than rounding them.
 - Financial/economic dates are calendar dates with daily granularity (`date`), represented as date-only values rather than instants. Operational metadata may use UTC `timestamptz`; it must never determine a financial effective date.
 - Give investments and actions stable identifiers.
 - Represent a transfer as one logical operation whose paired movements are written atomically.
 - Enforce required as-of dates for valuation marks.
 - Preserve closed-investment history.
 - Keep derived metrics reproducible from canonical actions and marks rather than storing hand-edited aggregate results.
-- No audit-log or change-history subsystem is required in EPIC 1. Correction behavior is a later workflow decision; preserving closed-investment history remains required.
+- No audit-log or change-history subsystem is required in EPIC 1. Explicit in-place correction of an existing valuation mark is supported; user-facing edit/delete policy remains a later workflow decision. Preserving closed-investment history remains required.
+
+Household IDs scope owner, investment, classification, action, movement, and valuation relationships; composite foreign keys reject cross-household links. Investments have one or more owners, with joint ownership represented by links rather than percentages. Classification IDs remain stable when labels change. Closing an investment requires a calendar date and preserves its rows; new ordinary activity is rejected after closure.
+
+Actions represent contributions, withdrawals, and transfers. A contribution or withdrawal has one investment movement; a transfer has one source outflow and one distinct destination inflow of the same amount. A deferred constraint trigger verifies the complete shape at commit, while `src/persistence/records.ts` writes each logical action and its movements in one transaction. Valuation marks live in a separate table and have one row per investment and as-of date. Gross value and debt are nonnegative; net value is derived and may be negative. `src/application/portfolio.ts` validates exact money and calendar dates through domain functions before calling its repository port. See [the data model](data-model.md) for economic meanings and explicit mark correction.
 
 PostgreSQL transactions should protect related writes such as transfer legs. Database constraints should enforce structural invariants where practical, while domain services own rules that depend on reporting boundaries or historical context.
 
@@ -111,8 +115,7 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
-- action correction and deletion semantics (an audit subsystem is outside EPIC 1);
-- duplicate valuation-mark handling;
+- user-facing action correction and deletion semantics (an audit subsystem is outside EPIC 1);
 - offline and client-cache boundaries;
 - PostgreSQL backup and recovery; and
 - whether and when imports justify a separate Python service.
