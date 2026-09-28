@@ -11,7 +11,7 @@ if [[ -z "${TEST_DATABASE_URL:-}" ]]; then
 fi
 
 dump=$1
-pg_restore --list "$dump" >/dev/null 2>&1 || { echo 'Selected dump is invalid.' >&2; exit 1; }
+pg_restore --list "$dump" >/dev/null || { echo 'Selected dump is invalid.' >&2; exit 1; }
 maintenance_url=$TEST_DATABASE_URL
 base=${maintenance_url%%\?*}
 query=${maintenance_url#"$base"}
@@ -19,7 +19,11 @@ if [[ ! $base =~ ^postgres(ql)?://.+/postgres$ ]]; then
   echo 'TEST_DATABASE_URL must name the postgres maintenance database.' >&2
   exit 1
 fi
-if [[ $(psql --dbname="$maintenance_url" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()' 2>/dev/null) != postgres ]]; then
+current_database=$(psql --dbname="$maintenance_url" -X -A -t -v ON_ERROR_STOP=1 -c 'select current_database()') || {
+  echo 'Could not connect to the postgres maintenance database.' >&2
+  exit 1
+}
+if [[ $current_database != postgres ]]; then
   echo 'Maintenance connection did not select the postgres database.' >&2
   exit 1
 fi
@@ -28,24 +32,29 @@ target="equinox_restore_$(date -u +%s)_${RANDOM}_${RANDOM}"
 target_url="${base%/*}/$target$query"
 created=false
 cleanup() {
+  exit_status=$?
+  trap - EXIT
   if [[ $created == true ]]; then
-    dropdb --maintenance-db="$maintenance_url" --if-exists "$target" >/dev/null 2>&1 ||
+    if ! dropdb --maintenance-db="$maintenance_url" --if-exists "$target" >/dev/null 2>&1; then
       echo 'Could not remove the generated restore database; clean it up on the test server.' >&2
+      exit_status=1
+    fi
   fi
+  exit "$exit_status"
 }
 trap cleanup EXIT
-createdb --maintenance-db="$maintenance_url" "$target" 2>/dev/null || {
+createdb --maintenance-db="$maintenance_url" "$target" || {
   echo 'Could not create a disposable restore database.' >&2
   exit 1
 }
 created=true
-pg_restore --exit-on-error --no-owner --no-privileges --dbname="$target_url" "$dump" >/dev/null 2>&1 || {
+pg_restore --exit-on-error --no-owner --no-privileges --dbname="$target_url" "$dump" >/dev/null || {
   echo 'Restore into the disposable database failed.' >&2
   exit 1
 }
 
 schema_count=$(psql --dbname="$target_url" -X -A -t -v ON_ERROR_STOP=1 -c "
-  select count(*) from drizzle.__drizzle_migrations;" 2>/dev/null) || {
+  select count(*) from drizzle.__drizzle_migrations;") || {
   echo 'Could not read restored migration history.' >&2
   exit 1
 }

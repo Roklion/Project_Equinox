@@ -33,12 +33,12 @@ if [[ -e "$final" ]]; then
 fi
 temporary=$(mktemp "$backup_dir/.equinox-$stamp.XXXXXXXX.tmp")
 
-pg_dump --dbname="$DATABASE_URL" --format=custom --file="$temporary" 2>/dev/null || {
+pg_dump --dbname="$DATABASE_URL" --format=custom --file="$temporary" || {
   echo 'pg_dump failed; check the private connection settings and database access.' >&2
   exit 1
 }
 [[ -s "$temporary" ]] || { echo 'pg_dump produced an empty file.' >&2; exit 1; }
-pg_restore --list "$temporary" >/dev/null 2>&1 || { echo 'Dump validation failed.' >&2; exit 1; }
+pg_restore --list "$temporary" >/dev/null || { echo 'Dump validation failed.' >&2; exit 1; }
 mv --no-clobber -- "$temporary" "$final"
 [[ -e "$temporary" ]] && { echo 'Backup finalization failed.' >&2; exit 1; }
 temporary=''
