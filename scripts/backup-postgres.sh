@@ -20,10 +20,19 @@ dump_pid=''
 dump_starting=false
 pending_signal=''
 cleanup() {
-  if [[ -n "$temporary" ]]; then rm -f -- "$temporary"; fi
-  if [[ "$lock_acquired" == true ]]; then
-    rmdir -- "$lock_dir" 2>/dev/null || true
+  local exit_status=$?
+  trap - EXIT
+  if [[ -n "$temporary" ]] && ! rm -f -- "$temporary"; then
+    echo 'Could not remove the temporary backup file.' >&2
+    exit_status=1
   fi
+  if [[ "$lock_acquired" == true ]]; then
+    if ! rmdir -- "$lock_dir" 2>/dev/null; then
+      echo 'Could not release the backup lock; inspect it before retrying.' >&2
+      exit_status=1
+    fi
+  fi
+  exit "$exit_status"
 }
 terminate_on_signal() {
   local signal=$1

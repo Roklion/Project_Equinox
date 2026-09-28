@@ -65,13 +65,17 @@ pg_restore --exit-on-error --no-owner --no-privileges --dbname="$target_url" "$d
   exit 1
 }
 
+# Keep these created_at identities aligned with drizzle/meta/_journal.json.
+expected_migration_times='1790395811882,1790481077627,1790481544775,1790525408351,1790525408352'
 schema_count=$(psql --dbname="$target_url" -X -A -t -v ON_ERROR_STOP=1 -c "
-  select count(*) from drizzle.__drizzle_migrations;") || {
+  select count(distinct created_at)
+  from drizzle.__drizzle_migrations
+  where created_at in ($expected_migration_times);") || {
   echo 'Could not read restored migration history.' >&2
   exit 1
 }
-if [[ $schema_count -lt 5 ]]; then
-  echo 'Restored database is missing current migration history.' >&2
+if [[ $schema_count != 5 ]]; then
+  echo 'Restored database is missing one or more current migration records.' >&2
   exit 1
 fi
 psql --dbname="$target_url" -X -v ON_ERROR_STOP=1 -q <<'SQL'
