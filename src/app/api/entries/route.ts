@@ -10,6 +10,10 @@ function text(input: EntryInput, key: string): string {
   return typeof input[key] === "string" ? input[key].trim() : "";
 }
 
+function valuationDebt(input: EntryInput): string {
+  return text(input, "debt") || "0";
+}
+
 function validate(input: EntryInput): FieldErrors {
   const errors: FieldErrors = {};
   const kind = text(input, "kind");
@@ -25,7 +29,8 @@ function validate(input: EntryInput): FieldErrors {
     }
   }
   for (const field of kind === "valuation" ? ["grossValue", "debt"] : ["amount"]) {
-    try { parseCents(text(input, field), kind === "valuation"); }
+    const value = field === "debt" ? valuationDebt(input) : text(input, field);
+    try { parseCents(value, kind === "valuation"); }
     catch { errors[field] = kind === "valuation" ? "Enter zero or more, with up to two decimal places." : "Enter an amount greater than zero, with up to two decimal places."; }
   }
   if (kind === "valuation" && !["create", "replace"].includes(text(input, "operation"))) {
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
       }
       if (kind === "valuation") {
         const mark = { householdId, investmentId: text(input, "investmentId"), asOfDate: date,
-          grossValue: text(input, "grossValue"), debt: text(input, "debt"), ...provenance };
+          grossValue: text(input, "grossValue"), debt: valuationDebt(input), ...provenance };
         return text(input, "operation") === "replace"
           ? service.replaceValuationMark(mark) : service.recordValuationMark(mark);
       }

@@ -92,6 +92,20 @@ describe("entry route", () => {
     }));
   });
 
+  it("defaults omitted or empty valuation debt to zero", async () => {
+    const base = { kind: "valuation", investmentId: "investment-a",
+      date: "2026-09-28", grossValue: "10.00", operation: "create" };
+    const omitted = await POST(post(base));
+    const empty = await POST(post({ ...base, debt: "" }));
+
+    expect(omitted.status).toBe(200);
+    expect(empty.status).toBe(200);
+    expect(service.recordValuationMark).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ grossValue: "10.00", debt: "0" }));
+    expect(service.recordValuationMark).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ grossValue: "10.00", debt: "0" }));
+  });
+
   it("reports an existing same-date mark without replacing it", async () => {
     service.recordValuationMark.mockRejectedValueOnce(new WorkflowError("mark_already_exists"));
     const response = await POST(post({ kind: "valuation", investmentId: "investment-a",

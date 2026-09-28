@@ -80,7 +80,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [savedLabel, setSavedLabel] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const contextInvestmentId = kind === "valuation" ? investmentId : "";
   useEffect(() => {
@@ -101,11 +102,11 @@ export function EntryForm({ kind }: { kind: Kind }) {
           previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
         setContext(body.context);
         setLatest(body.latest);
-        setFormError("");
+        setLoadError("");
       })
       .catch(() => {
         if (controller.signal.aborted) return;
-        setFormError("Unable to load investments. Please try again.");
+        setLoadError("Unable to load investments. Please try again.");
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -128,7 +129,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
     saving.current = true;
     setBusy(true);
     setErrors({});
-    setFormError("");
+    setSaveError("");
     const payload = {
       kind, date, investmentId, sourceInvestmentId: investmentId, destinationInvestmentId,
       amount, grossValue, debt, notes, sourceReference,
@@ -142,7 +143,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       const body = await response.json();
       if (!response.ok) {
         setErrors(body.fieldErrors ?? {});
-        setFormError(body.formError ?? (body.fieldErrors ? "Review the highlighted fields." : "Unable to save this entry."));
+        setSaveError(body.formError ?? (body.fieldErrors ? "Review the highlighted fields." : "Unable to save this entry."));
         if (kind === "valuation") { setLoading(true); setRefresh((current) => current + 1); }
         return;
       }
@@ -151,7 +152,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       setSaved(true);
       setRefresh((current) => current + 1);
     } catch {
-      setFormError("Unable to save this entry. Please try again.");
+      setSaveError("Unable to save this entry. Please try again.");
     } finally {
       saving.current = false;
       setBusy(false);
@@ -166,7 +167,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <div className="entry-actions">
           <button type="button" className="primary-button" onClick={() => {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("0");
-            setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({}); setFormError("");
+            setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({});
+            setLoadError(""); setSaveError("");
           }}>Add another</button>
           <Link href="/">Overview</Link>
         </div>
@@ -185,7 +187,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       <div className="entry-field">
         <label htmlFor="entry-date">{kind === "valuation" ? "As-of date" : "Effective date"}</label>
         <input id="entry-date" type="date" value={date} onChange={(event) => {
-          setDateOverride(event.target.value); setLoading(true); setContext(null); setLatest(null);
+          setDateOverride(event.target.value); setLoading(true); setInvestments([]); setContext(null); setLatest(null);
         }}
           required aria-invalid={Boolean(errors.date)} />
         {inputError(errors, "date")}
@@ -210,7 +212,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           options={investments} errors={errors} />
       )}
       {loading && <p className="entry-muted" role="status">Checking investments and date…</p>}
-      {!loading && !formError && investments.length === 0 && (
+      {!loading && !loadError && !saveError && investments.length === 0 && (
         <p className="entry-muted">No investments are available on this date.</p>
       )}
       {kind === "valuation" ? (
@@ -284,7 +286,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           {inputError(errors, "notes")}
         </div>
       </details>
-      {formError && <p role="alert" className="form-error">{formError}</p>}
+      {(saveError || loadError) && <p role="alert" className="form-error">{saveError || loadError}</p>}
       <div className="entry-actions">
         <button className="primary-button" type="submit" disabled={busy || loading || investments.length === 0}>
           {busy ? "Saving…" : kind === "valuation" && context?.existing ? "Correct existing mark" :
