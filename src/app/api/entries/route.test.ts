@@ -123,7 +123,7 @@ describe("entry route", () => {
       expect.objectContaining({ grossValue: "10.00", debt: "0" }));
   });
 
-  it("preserves existing debt when a replacement leaves debt blank", async () => {
+  it("preserves blank replacement debt and clears blank optional metadata", async () => {
     const response = await POST(post({ kind: "valuation", investmentId: "investment-a",
       date: "2026-09-28", grossValue: "110.00", debt: "", operation: "replace" }));
 
@@ -131,6 +131,7 @@ describe("entry route", () => {
     expect(service.getValuationContext).not.toHaveBeenCalled();
     expect(service.replaceValuationMark).toHaveBeenCalledWith(expect.objectContaining({
       grossValue: "110.00", debt: undefined, asOfDate: "2026-09-28",
+      notes: null, sourceReference: null,
     }));
   });
 
@@ -161,7 +162,8 @@ describe("entry route", () => {
 
   it("returns selected-date context and latest mark for an eligible investment", async () => {
     service.getValuationContext.mockResolvedValueOnce({
-      existing: { asOfDate: "2026-09-28", grossValue: "10.00", debt: "25.00", netValue: "-15.00" },
+      existing: { asOfDate: "2026-09-28", grossValue: "10.00", debt: "25.00", netValue: "-15.00",
+        notes: "Synthetic note", sourceReference: "synthetic-ref" },
       previous: null,
     });
     service.getLatestValuationMarks.mockResolvedValueOnce([
@@ -171,7 +173,8 @@ describe("entry route", () => {
       "http://localhost:3000/api/entries?date=2026-09-28&investmentId=investment-a"));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      context: { existing: { netValue: "-15.00" } },
+      context: { existing: { grossValue: "10.00", netValue: "-15.00",
+        notes: "Synthetic note", sourceReference: "synthetic-ref" } },
       latest: { investmentId: "investment-a", netValue: "-15.00" },
     });
   });

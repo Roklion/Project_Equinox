@@ -70,8 +70,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [amount, setAmount] = useState("");
   const [grossValue, setGrossValue] = useState("");
   const [debt, setDebt] = useState("");
-  const [notes, setNotes] = useState("");
-  const [sourceReference, setSourceReference] = useState("");
+  const [notes, setNotes] = useState<string | null>(null);
+  const [sourceReference, setSourceReference] = useState<string | null>(null);
   const [investments, setInvestments] = useState<InvestmentOption[]>([]);
   const [context, setContext] = useState<ValuationContext | null>(null);
   const [latest, setLatest] = useState<LatestMark | null>(null);
@@ -144,7 +144,9 @@ export function EntryForm({ kind }: { kind: Kind }) {
     setSaveError("");
     const payload = {
       kind, date, investmentId, sourceInvestmentId: investmentId, destinationInvestmentId,
-      amount, grossValue, debt, notes, sourceReference,
+      amount, grossValue, debt,
+      notes: notes ?? context?.existing?.notes ?? "",
+      sourceReference: sourceReference ?? context?.existing?.sourceReference ?? "",
       operation: context?.existing ? "replace" : "create",
     };
     try {
@@ -182,7 +184,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <div className="entry-actions">
           <button type="button" className="primary-button" onClick={() => {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("");
-            setNotes(""); setSourceReference(""); setDestinationInvestmentId(""); setErrors({});
+            setNotes(null); setSourceReference(null); setDestinationInvestmentId(""); setErrors({});
             setLoadError(""); setSaveError(""); setDetailsOpen(false);
             if (kind === "valuation") {
               setInvestmentId(""); setLoading(true); setContext(null); setLatest(null);
@@ -241,7 +243,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
           {context?.existing && (
             <div className="correction-notice">
               <strong>Existing mark on {date}</strong>
-              <p>Saving will correct this mark. Leave debt blank to keep its current amount, or enter zero to remove it.</p>
+              <p>Review its current values below. Saving will correct this mark. Leave debt blank to keep its current amount, or enter zero to remove it.</p>
             </div>
           )}
           <div className="entry-money-pair">
@@ -265,10 +267,19 @@ export function EntryForm({ kind }: { kind: Kind }) {
               {inputError(errors, "debt")}
             </div>
           </div>
-          {(enteredNet !== null || context?.previous || latest) && (
+          {(enteredNet !== null || context?.existing || context?.previous || latest) && (
             <section className="valuation-preview" aria-label="Valuation preview">
               {enteredNet !== null && <div><span>Entered net value</span><strong>{money(enteredNet)}</strong></div>}
-              {latest && latest.asOfDate !== context?.previous?.asOfDate && (
+              {context?.existing && (
+                <>
+                  <p>Current mark · {context.existing.asOfDate}</p>
+                  <div><span>Gross value</span><span>{money(context.existing.grossValue)}</span></div>
+                  <div><span>Linked debt</span><span>{money(context.existing.debt)}</span></div>
+                  <div><span>Net value</span><span>{money(context.existing.netValue)}</span></div>
+                </>
+              )}
+              {latest && latest.asOfDate !== context?.previous?.asOfDate &&
+                latest.asOfDate !== context?.existing?.asOfDate && (
                 <>
                   <p>Latest mark · {latest.asOfDate}</p>
                   <div><span>Net value</span><span>{money(latest.netValue)}</span></div>
@@ -303,7 +314,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <summary>Notes and source reference <span>Optional</span></summary>
         <div className="entry-field">
           <label htmlFor="sourceReference">Source reference</label>
-          <input id="sourceReference" type="text" value={sourceReference}
+          <input id="sourceReference" type="text" value={sourceReference ?? context?.existing?.sourceReference ?? ""}
             onChange={(event) => setSourceReference(event.target.value)} maxLength={200}
             aria-invalid={Boolean(errors.sourceReference)}
             aria-describedby={errors.sourceReference ? "sourceReference-error" : undefined} />
@@ -311,7 +322,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         </div>
         <div className="entry-field">
           <label htmlFor="notes">Notes</label>
-          <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)}
+          <textarea id="notes" value={notes ?? context?.existing?.notes ?? ""} onChange={(event) => setNotes(event.target.value)}
             rows={3} maxLength={2000} aria-invalid={Boolean(errors.notes)}
             aria-describedby={errors.notes ? "notes-error" : undefined} />
           {inputError(errors, "notes")}

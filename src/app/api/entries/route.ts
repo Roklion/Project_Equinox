@@ -103,12 +103,12 @@ export async function POST(request: NextRequest) {
   try {
     const result = await withEntryService(async ({ householdId, service }) => {
       const date = text(input, "date");
+      const kind = text(input, "kind");
       const provenance = {
         source: "manual" as const,
         sourceReference: text(input, "sourceReference") || undefined,
         notes: text(input, "notes") || undefined,
       };
-      const kind = text(input, "kind");
       if (kind === "transfer") {
         return service.recordTransfer({ householdId, sourceInvestmentId: text(input, "sourceInvestmentId"),
           destinationInvestmentId: text(input, "destinationInvestmentId"), effectiveDate: date,
@@ -122,7 +122,11 @@ export async function POST(request: NextRequest) {
           grossValue: text(input, "grossValue"), debt: debtInput || (operation === "create" ? "0" : undefined),
           ...provenance };
         return operation === "replace"
-          ? service.replaceValuationMark(mark) : service.recordValuationMark(mark);
+          ? service.replaceValuationMark({ ...mark,
+            sourceReference: text(input, "sourceReference") || null,
+            notes: text(input, "notes") || null,
+          })
+          : service.recordValuationMark(mark);
       }
       return service.recordExternalAction({ householdId, investmentId: text(input, "investmentId"),
         kind: kind as "contribution" | "withdrawal", effectiveDate: date,
