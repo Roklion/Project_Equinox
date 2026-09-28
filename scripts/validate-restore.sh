@@ -39,7 +39,7 @@ cleanup() {
   exit_status=$?
   trap - EXIT
   if [[ $created == true ]]; then
-    if ! dropdb --maintenance-db="$maintenance_url" --force --if-exists "$target" >/dev/null 2>&1; then
+    if ! dropdb --maintenance-db="$maintenance_url" --force --if-exists "$target" >/dev/null; then
       echo 'Could not remove the generated restore database; clean it up on the test server.' >&2
       exit_status=1
     fi

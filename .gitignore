@@ -17,5 +17,6 @@ Thumbs.db
 *.dump
 *.dump.tmp
 .equinox-*.tmp
+.equinox-backup.lock/
 *.backup
 *.sql.gz
