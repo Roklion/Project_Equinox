@@ -1,6 +1,6 @@
 import "server-only";
 import { createPortfolioService } from "@/application/portfolio";
-import { createDatabase } from "@/persistence/database";
+import { getDatabase } from "@/persistence/database";
 import { createPostgresPortfolioRepository } from "@/persistence/records";
 import { households } from "@/persistence/schema";
 
@@ -8,14 +8,10 @@ import { households } from "@/persistence/schema";
 export async function withEntryService<T>(
   run: (context: { householdId: string; service: ReturnType<typeof createPortfolioService> }) => Promise<T>,
 ): Promise<T | null> {
-  const { db, pool } = createDatabase();
-  try {
-    const rows = await db.select({ id: households.id }).from(households).limit(2);
-    if (rows.length !== 1) return null;
-    const householdId = rows[0].id;
-    // Resolve the household on the server. A client-supplied ID must never select another one.
-    return await run({ householdId, service: createPortfolioService(createPostgresPortfolioRepository(db)) });
-  } finally {
-    await pool.end();
-  }
+  const { db } = getDatabase();
+  const rows = await db.select({ id: households.id }).from(households).limit(2);
+  if (rows.length !== 1) return null;
+  const householdId = rows[0].id;
+  // Resolve the household on the server. A client-supplied ID must never select another one.
+  return run({ householdId, service: createPortfolioService(createPostgresPortfolioRepository(db)) });
 }

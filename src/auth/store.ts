@@ -1,13 +1,9 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { Pool } from "pg";
-import { createDatabase } from "@/persistence/database";
+import { getDatabase } from "@/persistence/database";
 
-const globalForAuth = globalThis as typeof globalThis & { equinoxAuthPool?: Pool };
-
-export function authDatabase(): Pool {
-  globalForAuth.equinoxAuthPool ??= createDatabase().pool;
-  return globalForAuth.equinoxAuthPool;
+export function authDatabase() {
+  return getDatabase().pool;
 }
 
 function tokenHash(token: string): string {

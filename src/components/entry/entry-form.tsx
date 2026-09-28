@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { InvestmentOption, StoredMark } from "@/application/ports";
-import { formatCents, netValue, parseCents } from "@/domain/financial";
+import { formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
 
 type Kind = "contribution" | "withdrawal" | "transfer" | "valuation";
 type MarkWithNet = StoredMark & { netValue: string };
@@ -17,6 +17,14 @@ function localCalendarDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function emptySubscribe() {
+  return () => {};
+}
+
+function serverCalendarDate() {
+  return "";
 }
 
 function money(value: string) {
@@ -53,7 +61,9 @@ function InvestmentSelect({ id, label, value, onChange, options, errors, exclude
 
 export function EntryForm({ kind }: { kind: Kind }) {
   const saving = useRef(false);
-  const [date, setDate] = useState("");
+  const browserDate = useSyncExternalStore(emptySubscribe, localCalendarDate, serverCalendarDate);
+  const [dateOverride, setDateOverride] = useState<string | null>(null);
+  const date = dateOverride ?? browserDate;
   const [investmentId, setInvestmentId] = useState("");
   const [destinationInvestmentId, setDestinationInvestmentId] = useState("");
   const [amount, setAmount] = useState("");
@@ -72,15 +82,12 @@ export function EntryForm({ kind }: { kind: Kind }) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDate(localCalendarDate()), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const contextInvestmentId = kind === "valuation" ? investmentId : "";
   useEffect(() => {
     if (!date) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ date });
-    if (kind === "valuation" && investmentId) query.set("investmentId", investmentId);
+    if (contextInvestmentId) query.set("investmentId", contextInvestmentId);
     fetch(`/api/entries?${query}`, { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         const body = await response.json();
@@ -89,21 +96,20 @@ export function EntryForm({ kind }: { kind: Kind }) {
       })
       .then((body) => {
         setInvestments(body.investments);
-        if (investmentId && !body.investments.some((item) => item.id === investmentId)) setInvestmentId("");
-        if (destinationInvestmentId && !body.investments.some((item) => item.id === destinationInvestmentId)) {
-          setDestinationInvestmentId("");
-        }
+        setInvestmentId((previous) => previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
+        setDestinationInvestmentId((previous) =>
+          previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
         setContext(body.context);
         setLatest(body.latest);
         setFormError("");
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (controller.signal.aborted) return;
-        setFormError(error instanceof Error ? error.message : "Unable to load investments.");
+        setFormError("Unable to load investments. Please try again.");
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [date, investmentId, destinationInvestmentId, kind, refresh]);
+  }, [date, contextInvestmentId, kind, refresh]);
 
   let enteredNet: string | null = null;
   let enteredDelta: string | null = null;
@@ -111,10 +117,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
     try {
       enteredNet = netValue(grossValue, debt);
       if (context?.previous) {
-        enteredDelta = formatCents(parseCents(enteredNet.replace("-", ""), true) *
-          (enteredNet.startsWith("-") ? -1n : 1n) -
-          parseCents(context.previous.netValue.replace("-", ""), true) *
-          (context.previous.netValue.startsWith("-") ? -1n : 1n));
+        enteredDelta = formatCents(parseSignedCents(enteredNet) - parseSignedCents(context.previous.netValue));
       }
     } catch { /* Show field validation after submit. */ }
   }
@@ -182,7 +185,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
       <div className="entry-field">
         <label htmlFor="entry-date">{kind === "valuation" ? "As-of date" : "Effective date"}</label>
         <input id="entry-date" type="date" value={date} onChange={(event) => {
-          setDate(event.target.value); setLoading(true); setContext(null); setLatest(null);
+          setDateOverride(event.target.value); setLoading(true); setContext(null); setLatest(null);
         }}
           required aria-invalid={Boolean(errors.date)} />
         {inputError(errors, "date")}
@@ -191,12 +194,12 @@ export function EntryForm({ kind }: { kind: Kind }) {
         <div className="transfer-pair">
           <InvestmentSelect id="investmentId" label="Move value from" value={investmentId}
             onChange={(value) => {
-              setInvestmentId(value); setLoading(true);
+              setInvestmentId(value);
               if (value === destinationInvestmentId) setDestinationInvestmentId("");
             }}
             options={investments} errors={errors} />
           <InvestmentSelect id="destinationInvestmentId" label="Move value to" value={destinationInvestmentId}
-            onChange={(value) => { setDestinationInvestmentId(value); setLoading(true); }}
+            onChange={setDestinationInvestmentId}
             options={investments} errors={errors} exclude={investmentId} />
         </div>
       ) : (
