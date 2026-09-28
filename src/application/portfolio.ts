@@ -1,4 +1,4 @@
-import { assertCalendarDate, formatCents, netValue, parseCents } from "@/domain/financial";
+import { assertCalendarDate, formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
 import { WorkflowError } from "./errors";
 import type { CreateInvestment, EditExternalAction, EditTransfer, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
 
@@ -11,7 +11,6 @@ function amount(value: string, allowZero = false) {
 }
 const positiveAmount = (value: string) => amount(value);
 const nonnegativeAmount = (value: string) => amount(value, true);
-const signedCents = (value: string) => BigInt(value.replace(".", ""));
 
 function validatedMark(input: WriteValuationMark): WriteValuationMark {
   calendarDate(input.asOfDate);
@@ -109,7 +108,7 @@ export function createPortfolioService(repository: PortfolioRepository) {
       const previous = context.previous && { ...context.previous, netValue: netValue(context.previous.grossValue, context.previous.debt) };
       const existing = context.existing && { ...context.existing, netValue: netValue(context.existing.grossValue, context.existing.debt) };
       return { previous, existing, enteredNetValue: currentNet,
-        enteredDelta: previous === null ? null : formatCents(signedCents(currentNet) - signedCents(previous.netValue)) };
+        enteredDelta: previous === null ? null : formatCents(parseSignedCents(currentNet) - parseSignedCents(previous.netValue)) };
     },
     async getInvestmentHistory(householdId: string, investmentId: string) {
       const history = await repository.getInvestmentHistory(householdId, investmentId);

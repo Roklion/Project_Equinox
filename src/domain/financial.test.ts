@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { assertCalendarDate, netMovementCents, netValue, parseCents } from "./financial";
+import { assertCalendarDate, netMovementCents, netValue, parseCents, parseSignedCents } from "./financial";
 
 describe("financial values", () => {
   it("preserves exact cents and permits negative derived equity", () => {
     expect(parseCents("123456789.10")).toBe(12345678910n);
     expect(netValue("100.00", "125.25")).toBe("-25.25");
+    expect(parseSignedCents("-25.25")).toBe(-2525n);
+    expect(parseSignedCents("0.05")).toBe(5n);
   });
 
   it("rejects rounding, negative inputs, and invalid calendar dates", () => {

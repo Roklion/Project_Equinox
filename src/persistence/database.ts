@@ -20,3 +20,13 @@ export function createDatabase(connectionString = readDatabaseUrl()) {
 
   return { db: drizzle(pool, { schema }), pool };
 }
+
+const globalForDatabase = globalThis as typeof globalThis & {
+  equinoxDatabase?: ReturnType<typeof createDatabase>;
+};
+
+/** Reuse one database pool across requests in this server runtime. */
+export function getDatabase() {
+  globalForDatabase.equinoxDatabase ??= createDatabase();
+  return globalForDatabase.equinoxDatabase;
+}

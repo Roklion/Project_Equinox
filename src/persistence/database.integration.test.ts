@@ -180,14 +180,15 @@ describe("PostgreSQL persistence", () => {
     const [owner] = await db.insert(owners).values({ householdId: home.id, name: "Owner" }).returning();
     const investment = await service.createInvestment({ householdId: home.id, name: "Sample holding", ownerIds: [owner.id] });
     const original = await service.recordValuationMark({ householdId: home.id, investmentId: investment.id,
-      asOfDate: "2026-04-01", grossValue: "100.00", source: "manual", sourceReference: "synthetic-ref", notes: "Synthetic note" });
+      asOfDate: "2026-04-01", grossValue: "100.00", debt: "25.00",
+      source: "manual", sourceReference: "synthetic-ref", notes: "Synthetic note" });
     await service.closeInvestment(home.id, investment.id, "2026-04-02");
     const replacement = await service.replaceValuationMark({ householdId: home.id, investmentId: investment.id,
-      asOfDate: "2026-04-01", debt: "125.00", source: null, sourceReference: null, notes: null });
+      asOfDate: "2026-04-01", grossValue: "110.00", source: null, sourceReference: null, notes: null });
     expect(replacement.id).toBe(original.id);
     const history = await service.getInvestmentHistory(home.id, investment.id);
     expect(history.marks).toEqual([expect.objectContaining({ id: original.id, asOfDate: "2026-04-01",
-      grossValue: "100.00", debt: "125.00", netValue: "-25.00",
+      grossValue: "110.00", debt: "25.00", netValue: "85.00",
       source: null, sourceReference: null, notes: null })]);
     expect(history.movements).toEqual([]);
     await expect(service.recordValuationMark({ householdId: home.id, investmentId: investment.id,

@@ -34,6 +34,13 @@ export function parseCents(value: string, allowZero = false): bigint {
   return cents;
 }
 
+export function parseSignedCents(value: string): bigint {
+  const negative = value.startsWith("-");
+  const absolute = negative ? value.slice(1) : value;
+  const cents = parseCents(absolute, true);
+  return negative ? -cents : cents;
+}
+
 export function formatCents(cents: bigint): string {
   const sign = cents < 0n ? "-" : "";
   const absolute = cents < 0n ? -cents : cents;
