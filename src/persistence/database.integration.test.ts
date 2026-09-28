@@ -270,17 +270,15 @@ describe("PostgreSQL persistence", () => {
       asOfDate: "2026-06-01", grossValue: "10" });
     const old = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
       asOfDate: "2026-07-01", grossValue: "20", debt: "25" });
-    const afterClose = await service.recordValuationMark({ householdId: home.id, investmentId: c.id,
-      asOfDate: "2026-07-02", grossValue: "40" });
     await service.closeInvestment(home.id, c.id, "2026-07-01");
+    // The database also rejects a close date before an existing later mark. The
+    // batch still checks lifecycle before the missing-mark correction result.
     await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-02", rows: [
       { operation: "create", investmentId: a.id, grossValue: "10" },
       { operation: "replace", investmentId: c.id, grossValue: "50" },
     ] })).rejects.toMatchObject({ code: "investment_unavailable" });
-    expect(await db.select({ id: valuationMarks.id, grossValue: valuationMarks.grossValue })
-      .from(valuationMarks).where(eq(valuationMarks.investmentId, c.id))).toEqual([
-      { id: afterClose.id, grossValue: "40.00" },
-    ]);
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, a.id))).toHaveLength(0);
+    expect(await db.select().from(valuationMarks).where(eq(valuationMarks.investmentId, c.id))).toHaveLength(0);
     await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-02", rows: [
       { operation: "create", investmentId: a.id, grossValue: "10" },
       { operation: "create", investmentId: c.id, grossValue: "10" },
