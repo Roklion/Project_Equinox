@@ -15,15 +15,16 @@ This document defines Equinox's initial interface and interaction direction. Pro
 
 A primary investment or portfolio view should generally present:
 
-1. name, scope, and as-of date;
-2. current NAV and period change;
-3. the split between cash-flow and performance effects;
-4. a value-history chart;
-5. allocation or composition;
-6. MOIC and XIRR with their period and context; and
-7. underlying investments, actions, and metadata.
+1. the headline current value;
+2. the relevant change and its context;
+3. the as-of date and selected period;
+4. the split between cash-flow and performance effects;
+5. a value-history chart;
+6. allocation or composition;
+7. MOIC and XIRR with their period and context; and
+8. underlying investments, actions, and metadata.
 
-This sequence is guidance rather than a fixed page template. Small screens may distribute it across summary and detail surfaces.
+Investment name and scope identify the view without competing with its primary value. This sequence is guidance rather than a fixed page template; small screens may distribute it across summary and detail surfaces.
 
 ## Visual reference direction
 
@@ -53,6 +54,10 @@ Color must not carry meaning alone. Positive and negative states need labels, si
 The initial shell uses a light neutral canvas, white surfaces, dark green text and accents, system sans-serif body text, and a system serif display face. Semantic CSS custom properties in `src/app/globals.css` own its colors, fonts, spacing, radii, and elevation; no external font request is required. This is a starting visual direction, not a complete brand system. The shell stacks its header below 40rem, includes a keyboard skip link and visible link focus, and displays an explicit empty state without invented financial values or nonfunctional action controls. Navigation and investment-entry composition remain future work.
 
 Financial values use tabular numerals where available, an explicit currency, consistent precision within a view, and a real unavailable state such as an em dash. Negative values retain their sign. Every current-value context includes an as-of date.
+
+For financial output surfaces, use Monarch Money as a consumer-finance hierarchy reference without copying its branding or exact screens: lead with the financial value, then its delta or context, then the as-of date, followed by supporting details and controls. Apply this to post-save summaries, previous-value context, investment rows, and history. Entry forms use the same visual language while keeping interaction optimized for fast, clear input.
+
+Reusable value, delta, date, investment-row, and history components should compose with both the total-value trend and the stacked composition-over-time chart. The trend explains how much value changed; composition explains what makes up that value. Keep their visual roles distinct.
 
 ## Charts
 
@@ -97,7 +102,7 @@ Desktop can use side-by-side summaries, charts, filters, and tables when width s
 
 Entry surfaces should default dates and recent selections when safe, accept keyboard and touch input efficiently, validate close to the field, and keep financial signs understandable through language such as contribution and distribution.
 
-Batch valuation entry should allow a user to choose an as-of date, review a list of relevant investments, enter gross value and linked debt efficiently, see derived NAV before saving, and identify omissions or invalid entries without losing valid work. Exact partial-save and correction behavior remains to be decided.
+Batch valuation entry should allow a user to choose an as-of date, review a list of relevant investments, enter gross value and linked debt efficiently, see derived NAV before saving, and identify omissions or invalid entries without losing entered values. Untouched blank rows are omitted. Validate all entered rows together and save them atomically; an invalid or conflicting row prevents the whole batch from being written. A same-date mark requires an explicit create or replacement choice, and validation or write failures keep the entered values available for correction.
 
 ## Component direction
 

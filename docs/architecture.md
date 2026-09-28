@@ -39,7 +39,7 @@ The initial scaffold uses these homes:
 | Framework-independent types and financial rules | `src/domain` |
 | Database access, transactions, and migrations | `src/persistence` |
 
-Dependency direction is presentation → application → domain. Persistence implements application-owned repository ports; the application service does not import the PostgreSQL adapter. Domain code does not depend on Next.js, React, or persistence. ESLint guards imports from higher-level folders. The EPIC 1 application service provides only creation, lifecycle, recording, explicit valuation correction, and history queries; full user-facing workflows remain later work.
+Dependency direction is presentation → application → domain. Persistence implements application-owned repository ports; the application service does not import the PostgreSQL adapter. Domain code does not depend on Next.js, React, or persistence. ESLint guards imports from higher-level folders. The application service exposes canonical action create/edit/delete commands, explicit valuation creation/replacement/deletion and atomic batch save, plus investment eligibility, history, latest marks, and previous/same-date valuation context. Responsive presentation workflows remain separate.
 
 Use the `@/` alias for imports rooted at `src`. Domain tests live beside their implementation and run in Vitest's Node environment, without browser or database dependencies. Node.js 24 and npm 11 are the scaffold toolchain; the npm lockfile records reproducible dependency versions. The hosted topology uses Vercel for Next.js and Neon Free for PostgreSQL; [hosted deployment](hosted-deployment.md) owns operational instructions.
 
@@ -76,7 +76,7 @@ Database integration tests require a separate `TEST_DATABASE_URL` with permissio
 - Enforce required as-of dates for valuation marks.
 - Preserve closed-investment history.
 - Keep derived metrics reproducible from canonical actions and marks rather than storing hand-edited aggregate results.
-- No audit-log or change-history subsystem is required in EPIC 1. Explicit in-place correction of an existing valuation mark is supported; user-facing edit/delete policy remains a later workflow decision. Preserving closed-investment history remains required.
+- The MVP has no audit-log or change-history subsystem. Corrections update canonical records in place. A transfer's linked legs are edited or deleted as one transaction. A batch mark save validates all entered rows before mutation and commits them in one transaction. Explicit deletion confirmation belongs to presentation. Preserving closed-investment history remains required unless a user explicitly corrects or deletes a historical record.
 
 Household IDs scope owner, investment, classification, action, movement, and valuation relationships; composite foreign keys reject cross-household links. Investments have one or more owners, with joint ownership represented by links rather than percentages. Classification IDs remain stable when labels change. Closing an investment requires a calendar date and preserves its rows; new ordinary activity is rejected after closure.
 
@@ -115,7 +115,7 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
 - valuation alignment across calendar dates;
-- user-facing action correction and deletion semantics (an audit subsystem is outside EPIC 1);
+- presentation details for action correction and deletion confirmation;
 - offline and client-cache boundaries;
 - PostgreSQL backup and recovery; and
 - whether and when imports justify a separate Python service.
