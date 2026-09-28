@@ -37,6 +37,7 @@ export type ValuationBatchRow =
   | ({ operation: "create" } & Omit<WriteValuationMark, "householdId" | "asOfDate">)
   | ({ operation: "replace" } & Omit<ReplaceValuationMark, "householdId" | "asOfDate">);
 export type SaveValuationBatch = { householdId: HouseholdId; asOfDate: string; rows: ValuationBatchRow[] };
+export type EditValuationMark = Omit<WriteValuationMark, keyof Provenance> & CorrectableProvenance & { originalAsOfDate: string };
 export type InvestmentOption = {
   id: InvestmentId; name: string; status: "active" | "closed"; closedOn: string | null;
   assetClass: string | null; accountType: string | null; taxStatus: string | null;
@@ -67,9 +68,11 @@ export interface PortfolioRepository {
   deleteTransfer(input: DeleteAction): Promise<void>;
   recordValuationMark(input: WriteValuationMark): Promise<StoredMark>;
   replaceValuationMark(input: ReplaceValuationMark): Promise<StoredMark>;
+  editValuationMark(input: EditValuationMark): Promise<StoredMark>;
   deleteValuationMark(householdId: HouseholdId, investmentId: InvestmentId, asOfDate: string): Promise<void>;
   saveValuationBatch(input: SaveValuationBatch): Promise<StoredMark[]>;
   getEligibleInvestments(householdId: HouseholdId, asOfDate: string): Promise<InvestmentOption[]>;
+  getInvestments(householdId: HouseholdId): Promise<InvestmentOption[]>;
   getLatestValuationMarks(householdId: HouseholdId): Promise<Array<StoredMark & { investmentId: InvestmentId }>>;
   getValuationContext(householdId: HouseholdId, investmentId: InvestmentId, asOfDate: string): Promise<{
     existing: StoredMark | null; previous: StoredMark | null;

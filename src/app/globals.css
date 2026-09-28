@@ -125,6 +125,32 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
   main { padding-block: var(--space-5); }
 }
 
+.batch-form, .history-panel { display: grid; gap: var(--space-3); }
+.batch-date, .history-picker { max-width: 22rem; }
+.batch-list, .history-list { display: grid; gap: var(--space-2); }
+.batch-row, .history-item { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.batch-row-heading, .history-item { display: flex; justify-content: space-between; gap: var(--space-3); }
+.batch-row h2, .history-item h2 { font-size: 1.45rem; margin: 0; }
+.batch-row-heading p, .batch-prior { color: var(--color-muted); margin: 0.25rem 0; font-size: 0.9rem; }
+.batch-existing { align-self: start; padding: 0.25rem 0.65rem; border-radius: 2rem; background: var(--color-accent-soft); font-size: 0.85rem; font-weight: 700; }
+.batch-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); }
+.batch-net { margin-bottom: 0; }
+.batch-net strong { font-size: 1.2rem; }
+.history-mark { border-left: 5px solid var(--color-accent); }
+.history-item .eyebrow { margin: 0; }
+.history-value { display: grid; justify-items: end; gap: 0.25rem; text-align: right; }
+.history-value strong { font-family: var(--font-display); font-size: 1.6rem; font-weight: 400; }
+.history-value span { color: var(--color-muted); font-size: 0.9rem; }
+.history-edit { max-width: none; }
+.danger-button { color: #9b2f2f; }
+.batch-form input:focus-visible, .batch-form select:focus-visible, .history-panel input:focus-visible, .history-panel select:focus-visible, .history-panel textarea:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+@media (max-width: 40rem) {
+  .batch-fields { grid-template-columns: 1fr; }
+  .batch-row-heading, .history-item { flex-direction: column; }
+  .history-value { justify-items: start; text-align: left; }
+  .batch-row, .history-item { padding: var(--space-2); }
+}
+
 .page-actions { display: flex; justify-content: flex-end; margin-bottom: var(--space-2); }
 .text-button { border: 0; padding: var(--space-1); background: transparent; color: var(--color-accent); font: inherit; font-weight: 700; cursor: pointer; }
 .text-button:focus-visible, .login-form button:focus-visible, .login-form input:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }

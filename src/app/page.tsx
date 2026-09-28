@@ -15,14 +15,16 @@ export default function HomePage() {
           Record cash flows, transfers, and valuation marks as they happen.
         </p>
         <Link className="primary-button add-launcher" href="/add">Add entry <span aria-hidden="true">＋</span></Link>
+        <div className="entry-actions"><Link href="/valuations/batch">Batch valuation update</Link>
+          <Link href="/investments/history">Investment history</Link></div>
       </section>
       <section className="empty-state" aria-labelledby="empty-title">
         <div className="empty-symbol" aria-hidden="true">↗</div>
         <p className="eyebrow">Coming into view</p>
         <h2 id="empty-title">Your overview is taking shape.</h2>
         <p>
-          The entry workflows are ready for existing investments. Value trends and
-          action history will appear here in a later update.
+          Record entries, update several valuations, and review the history of each investment.
+          Value trends will appear here in a later update.
         </p>
       </section>
     </>

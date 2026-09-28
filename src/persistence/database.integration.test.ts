@@ -306,6 +306,16 @@ describe("PostgreSQL persistence", () => {
       expect.objectContaining({ investmentId: a.id, netValue: "-2.00" }),
       expect.objectContaining({ investmentId: b.id, netValue: "5.00" }),
     ]));
+    const corrected = await service.editValuationMark({ householdId: home.id, investmentId: b.id,
+      originalAsOfDate: "2026-06-01", asOfDate: "2026-06-02", grossValue: "8", debt: "12" });
+    expect(corrected.id).toBe(prior.id);
+    await expect(service.editValuationMark({ householdId: home.id, investmentId: b.id,
+      originalAsOfDate: "2026-06-02", asOfDate: "2026-07-01", grossValue: "9", debt: "0" }))
+      .rejects.toMatchObject({ code: "mark_already_exists" });
+    expect((await service.getInvestmentHistory(home.id, b.id)).marks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: prior.id, asOfDate: "2026-06-02", netValue: "-4.00" }),
+      expect.objectContaining({ id: old.id, asOfDate: "2026-07-01", netValue: "5.00" }),
+    ]));
     await expect(deleteValuationMark(db, home.id, a.id, "2026-7-1")).rejects.toThrow();
     expect(await db.select({ id: valuationMarks.id }).from(valuationMarks).where(eq(valuationMarks.id, saved[0].id)))
       .toEqual([{ id: saved[0].id }]);

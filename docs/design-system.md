@@ -108,6 +108,8 @@ Transfer entry labels its two investments as “Move value from” and “Move v
 
 Batch valuation entry should allow a user to choose an as-of date, review a list of relevant investments, enter gross value and linked debt efficiently, see derived NAV before saving, and identify omissions or invalid entries without losing entered values. Untouched blank rows are omitted. Validate all entered rows together and save them atomically; an invalid or conflicting row prevents the whole batch from being written. A same-date mark requires an explicit create or replacement choice, and validation or write failures keep the entered values available for correction.
 
+The batch page lists active investments in stable name order, shows previous or latest net value and same-date marks, and requires an explicit correction choice for a same-date mark. Changing its shared date with entered values asks before clearing them. Investment history is a separate chronological surface available for active and closed investments. It labels valuation observations separately from cash movements and opens a single correction form for a whole transfer. Delete controls confirm the logical entry being removed.
+
 ## Component direction
 
 Likely reusable components include value summaries, metric cards, as-of labels, delta breakdowns, classification chips, chart frames, action-entry fields, investment rows, empty states, and unavailable metric explanations. Components should encode stable presentation and accessibility behavior; domain calculations remain outside the component layer.

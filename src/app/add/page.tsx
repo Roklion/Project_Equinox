@@ -23,6 +23,7 @@ export default function AddPage() {
           </Link>
         ))}
       </nav>
+      <p className="entry-topline"><Link href="/valuations/batch">Update several valuation marks →</Link></p>
     </>
   );
 }

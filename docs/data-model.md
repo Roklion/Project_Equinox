@@ -59,6 +59,8 @@ Debt may exceed gross value; negative net investment value is valid. A mark is a
 
 The MVP accepts one mark per investment and calendar date. A second insert is rejected by a database uniqueness constraint. An explicit replacement operation updates an existing mark on that date in place, including a historical mark on a closed investment. It fails if no mark exists; no silent insert or overwrite occurs. A batch valuation save uses one shared as-of date, omits untouched rows, and identifies each entered row as creation or replacement. All rows are validated before writing and the batch commits atomically.
 
+An investment-history correction may also change a mark's as-of date while retaining the mark's identity. The corrected date must be valid for the investment lifecycle and must not collide with another mark for the same investment. A collision fails the correction without replacing the other mark.
+
 ## Lifecycle
 
 An investment can be active or closed. Closing stops ordinary forward data entry after the close date but does not delete actions, marks, classifications, or historical participation in portfolio calculations. Historical actions and marks on or before the close date may be entered or explicitly corrected. Reopening behavior remains a future product decision.
