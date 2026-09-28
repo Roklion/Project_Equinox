@@ -210,7 +210,8 @@ export function EntryForm({ kind }: { kind: Kind }) {
       ) : (
         <InvestmentSelect id="investmentId" label="Investment" value={investmentId}
           onChange={(value) => {
-            setInvestmentId(value); setLoading(true); setContext(null); setLatest(null);
+            setInvestmentId(value);
+            if (kind === "valuation") { setLoading(true); setContext(null); setLatest(null); }
           }}
           options={investments} errors={errors} />
       )}
