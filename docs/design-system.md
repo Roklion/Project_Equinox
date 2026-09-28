@@ -25,6 +25,25 @@ A primary investment or portfolio view should generally present:
 
 This sequence is guidance rather than a fixed page template. Small screens may distribute it across summary and detail surfaces.
 
+## Visual reference direction
+
+Equinox output and visualization surfaces should take **Monarch Money as a visual reference**, without copying its branding, proprietary layouts, or individual screens. The target is the same class of polished consumer-finance presentation: calm, spacious, value-first, and immediately legible.
+
+Use this reference primarily for **output surfaces** such as dashboards, investment detail, value summaries, history context, and charts. Input workflows should still optimize first for speed, clarity, keyboard use, and touch ergonomics rather than imitating another product's interaction model.
+
+Translate the reference into these Equinox principles:
+
+- make the primary financial value the strongest visual element;
+- follow a clear **value → delta/context → as-of date → supporting detail** hierarchy;
+- use a light neutral canvas, white/light surfaces, restrained dark-green accents, and generous whitespace;
+- prefer subtle borders/elevation and rounded consumer-product surfaces over dense card grids;
+- keep chart chrome, axes, and gridlines visually quiet so the data carries the emphasis;
+- use subdued categorical colors rather than saturated rainbow palettes;
+- preserve the same visual language across desktop and iPhone while allowing composition to change;
+- avoid generic admin-dashboard styling, dense institutional-finance terminals, and repeated KPI-card grids.
+
+The exact palette, typography, and icon system may continue to evolve, but new UI work should preserve this visual character unless a concrete usability or accessibility requirement calls for a different treatment.
+
 ## Visual language
 
 Use semantic design tokens for color, typography, spacing, radii, elevation, and chart series. The specific palette and typeface remain open until visual exploration and accessibility testing.
@@ -37,15 +56,38 @@ Financial values use tabular numerals where available, an explicit currency, con
 
 ## Charts
 
-Apache ECharts is the planned charting system.
+Apache ECharts is the planned charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
 
-- Use line or subtle area charts for value over time.
-- Use stacked-area charts when change in composition over time is the question.
+### Chart hierarchy
+
+Use two complementary chart roles:
+
+1. **Primary value trend — line/subtle area chart.** This answers **"How much is this worth over time?"** for a household, portfolio/view, group, or investment. Keep the visual treatment minimal: a clear value series, restrained gridlines, compact time controls, and prominent selected date/value context.
+2. **Composition over time — stacked area chart.** This is an Equinox-specific core visualization inspired by the user's existing spreadsheet workflow. It answers **"What is that value made of over time?"** while presenting the result as an app-native consumer visualization rather than an embedded spreadsheet chart.
+
+The stacked composition chart should be able to group the same underlying investment values by useful dimensions such as:
+
+- investment;
+- asset class;
+- account type;
+- owner;
+- tax status where useful; and
+- custom group.
+
+Additional grouping dimensions should reuse canonical classifications rather than creating chart-specific financial state.
+
+### Chart behavior and styling
+
+- Use a simple line/subtle area chart as the default hero trend instead of making stacked composition the only value view.
+- Use stacked area when composition change is the question; avoid a rainbow palette, heavy outlines, dense legends, or spreadsheet-style chart chrome.
+- Use soft/subdued categorical fills with sufficient distinction and accessibility; color must not be the only differentiator where identification matters.
+- Tooltips for composition should show the selected date, total value, and visible segment values without obscuring the point being inspected.
+- Allow hide/show or filtering of segments only when it improves readability; do not add chart controls merely for feature completeness.
 - Use purpose-built summary treatments for XIRR and MOIC; a gauge or decorative market-terminal visualization is not required.
-- Tooltips should show the date, value, relevant series, and cash-flow context without obscuring the selected point.
 - Charts need accessible text summaries and must not be the sole source of essential information.
+- When a selected point/date changes, reflect the important date/value context outside the tooltip where the surrounding surface benefits from it.
 
-On desktop, charts support hover and precise pointer inspection. On iPhone, they support touch scrubbing with a stable crosshair or selection marker, appropriately sized targets, and behavior that does not trap ordinary page scrolling.
+On desktop, charts support hover and precise pointer inspection. On iPhone, they support touch scrubbing with a stable crosshair or selection marker, appropriately sized targets, and behavior that does not trap ordinary page scrolling. Small screens may simplify legends or move composition details into a drill-down surface rather than compressing unreadable labels.
 
 ## Responsive behavior
 
