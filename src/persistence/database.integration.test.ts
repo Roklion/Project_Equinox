@@ -7,7 +7,7 @@ import { createPortfolioService } from "@/application/portfolio";
 import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
-import { createInvestment, closeInvestment, createPostgresPortfolioRepository, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
+import { createInvestment, closeInvestment, createPostgresPortfolioRepository, deleteValuationMark, editExternalAction, editTransfer, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
 import { actions, assetClasses, households, institutions, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
@@ -212,6 +212,12 @@ describe("PostgreSQL persistence", () => {
     expect((await service.getInvestmentHistory(home.id, b.id)).movements).toEqual([
       expect.objectContaining({ actionId: external.id, kind: "withdrawal", direction: "out", amount: "4.50" }),
     ]);
+    await expect(editExternalAction(db, { householdId: home.id, actionId: external.id, investmentId: b.id,
+      kind: "withdrawal", effectiveDate: "2026-06-02", amount: "4.505" })).rejects.toThrow();
+    expect(await db.select({ amount: actions.amount }).from(actions).where(eq(actions.id, external.id)))
+      .toEqual([{ amount: "4.50" }]);
+    expect(await db.select({ amount: movements.amount }).from(movements).where(eq(movements.actionId, external.id)))
+      .toEqual([{ amount: "4.50" }]);
     const transfer = await service.recordTransfer({ householdId: home.id, sourceInvestmentId: a.id,
       destinationInvestmentId: b.id, effectiveDate: "2026-06-03", amount: "3" });
     await service.editTransfer({ householdId: home.id, actionId: transfer.id, sourceInvestmentId: b.id,
@@ -224,6 +230,14 @@ describe("PostgreSQL persistence", () => {
     expect((await service.getInvestmentHistory(home.id, b.id)).movements).toEqual(expect.arrayContaining([
       expect.objectContaining({ actionId: transfer.id, counterpartyInvestmentId: c.id }),
     ]));
+    await expect(editTransfer(db, { householdId: home.id, actionId: transfer.id, sourceInvestmentId: b.id,
+      destinationInvestmentId: c.id, effectiveDate: "2026-06-04", amount: "5.005" })).rejects.toThrow();
+    expect(await db.select({ amount: actions.amount }).from(actions).where(eq(actions.id, transfer.id)))
+      .toEqual([{ amount: "5.00" }]);
+    expect(await db.select({ role: movements.role, amount: movements.amount }).from(movements)
+      .where(eq(movements.actionId, transfer.id)).orderBy(asc(movements.role))).toEqual([
+      { role: "destination", amount: "5.00" }, { role: "source", amount: "5.00" },
+    ]);
     await service.closeInvestment(home.id, b.id, "2026-06-04");
     await service.editExternalAction({ householdId: home.id, actionId: external.id, investmentId: b.id,
       kind: "withdrawal", effectiveDate: "2026-06-02", amount: "4", notes: null });
@@ -256,7 +270,17 @@ describe("PostgreSQL persistence", () => {
       asOfDate: "2026-06-01", grossValue: "10" });
     const old = await service.recordValuationMark({ householdId: home.id, investmentId: b.id,
       asOfDate: "2026-07-01", grossValue: "20", debt: "25" });
+    const afterClose = await service.recordValuationMark({ householdId: home.id, investmentId: c.id,
+      asOfDate: "2026-07-02", grossValue: "40" });
     await service.closeInvestment(home.id, c.id, "2026-07-01");
+    await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-02", rows: [
+      { operation: "create", investmentId: a.id, grossValue: "10" },
+      { operation: "replace", investmentId: c.id, grossValue: "50" },
+    ] })).rejects.toMatchObject({ code: "investment_unavailable" });
+    expect(await db.select({ id: valuationMarks.id, grossValue: valuationMarks.grossValue })
+      .from(valuationMarks).where(eq(valuationMarks.investmentId, c.id))).toEqual([
+      { id: afterClose.id, grossValue: "40.00" },
+    ]);
     await expect(service.saveValuationBatch({ householdId: home.id, asOfDate: "2026-07-02", rows: [
       { operation: "create", investmentId: a.id, grossValue: "10" },
       { operation: "create", investmentId: c.id, grossValue: "10" },
@@ -283,6 +307,9 @@ describe("PostgreSQL persistence", () => {
       expect.objectContaining({ investmentId: a.id, netValue: "-2.00" }),
       expect.objectContaining({ investmentId: b.id, netValue: "5.00" }),
     ]));
+    await expect(deleteValuationMark(db, home.id, a.id, "2026-7-1")).rejects.toThrow();
+    expect(await db.select({ id: valuationMarks.id }).from(valuationMarks).where(eq(valuationMarks.id, saved[0].id)))
+      .toEqual([{ id: saved[0].id }]);
     const context = await service.previewValuationDelta(home.id, b.id, "2026-07-02", "25", "40");
     expect(context).toMatchObject({ previous: { id: old.id, netValue: "5.00" },
       enteredNetValue: "-15.00", enteredDelta: "-20.00" });

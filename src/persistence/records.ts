@@ -148,16 +148,17 @@ async function requireAction(tx: Transaction, householdId: string, actionId: str
 }
 
 export async function editExternalAction(db: Database, input: EditExternalAction) {
+  const amount = exactAmount(input.amount);
   return db.transaction(async (tx) => {
     await requireAction(tx, input.householdId, input.actionId, ["contribution", "withdrawal"]);
     await requireValidActivityDate(tx, input.householdId, input.investmentId, input.effectiveDate);
     // Replacing the leg is required when the investment changes; the deferred shape check sees the final pair.
     await tx.delete(movements).where(and(eq(movements.householdId, input.householdId), eq(movements.actionId, input.actionId)));
     const [action] = await tx.update(actions).set({ kind: input.kind, effectiveDate: input.effectiveDate,
-      amount: input.amount, source: input.source, sourceReference: input.sourceReference, notes: input.notes })
+      amount, source: input.source, sourceReference: input.sourceReference, notes: input.notes })
       .where(and(eq(actions.householdId, input.householdId), eq(actions.id, input.actionId))).returning();
     await tx.insert(movements).values({ householdId: input.householdId, actionId: input.actionId,
-      investmentId: input.investmentId, role: "external", direction: input.kind === "contribution" ? "in" : "out", amount: input.amount });
+      investmentId: input.investmentId, role: "external", direction: input.kind === "contribution" ? "in" : "out", amount });
     return action;
   });
 }
@@ -172,19 +173,20 @@ export async function deleteExternalAction(db: Database, householdId: string, ac
 
 export async function editTransfer(db: Database, input: EditTransfer) {
   if (input.sourceInvestmentId === input.destinationInvestmentId) throw new WorkflowError("invalid_transfer");
+  const amount = exactAmount(input.amount);
   return db.transaction(async (tx) => {
     await requireAction(tx, input.householdId, input.actionId, ["transfer"]);
     await requireValidActivityDate(tx, input.householdId, input.sourceInvestmentId, input.effectiveDate);
     await requireValidActivityDate(tx, input.householdId, input.destinationInvestmentId, input.effectiveDate);
     await tx.delete(movements).where(and(eq(movements.householdId, input.householdId), eq(movements.actionId, input.actionId)));
-    const [action] = await tx.update(actions).set({ effectiveDate: input.effectiveDate, amount: input.amount,
+    const [action] = await tx.update(actions).set({ effectiveDate: input.effectiveDate, amount,
       source: input.source, sourceReference: input.sourceReference, notes: input.notes })
       .where(and(eq(actions.householdId, input.householdId), eq(actions.id, input.actionId))).returning();
     await tx.insert(movements).values([
       { householdId: input.householdId, actionId: input.actionId, investmentId: input.sourceInvestmentId,
-        role: "source", direction: "out", amount: input.amount },
+        role: "source", direction: "out", amount },
       { householdId: input.householdId, actionId: input.actionId, investmentId: input.destinationInvestmentId,
-        role: "destination", direction: "in", amount: input.amount },
+        role: "destination", direction: "in", amount },
     ]);
     return action;
   });
@@ -199,6 +201,7 @@ export async function deleteTransfer(db: Database, householdId: string, actionId
 }
 
 export async function deleteValuationMark(db: Database, householdId: string, investmentId: string, asOfDate: string) {
+  assertCalendarDate(asOfDate);
   const [deleted] = await db.delete(valuationMarks).where(and(eq(valuationMarks.householdId, householdId),
     eq(valuationMarks.investmentId, investmentId), eq(valuationMarks.asOfDate, asOfDate))).returning({ id: valuationMarks.id });
   if (!deleted) throw new WorkflowError("mark_not_found");
@@ -236,8 +239,8 @@ export async function saveValuationBatch(db: Database, input: SaveValuationBatch
 
     for (const row of rows) {
       const investment = investmentsById.get(row.investmentId);
-      if (row.operation === "create" && (!investment || (investment.status === "closed" &&
-        (!investment.closedOn || input.asOfDate > investment.closedOn)))) {
+      if (!investment || (investment.status === "closed" &&
+        (!investment.closedOn || input.asOfDate > investment.closedOn))) {
         throw new WorkflowError("investment_unavailable");
       }
       if (row.operation === "create" && existingByInvestment.has(row.investmentId)) {
