@@ -17,7 +17,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 ## Status
 
-The foundation includes a responsive shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, installable PWA metadata, canonical financial domain tables, and persistence/application services for investment lifecycle, actions, valuations, and history queries. The primary Add launcher supports contribution, withdrawal, transfer, and single-investment valuation entry for an existing household and investment set. Batch valuation, correction history surfaces, and charts remain future work. Offline financial-data behavior is intentionally deferred.
+The foundation includes a responsive shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, installable PWA metadata, canonical financial domain tables, and persistence/application services for investment lifecycle, actions, valuations, and history queries. The primary Add launcher supports contribution, withdrawal, transfer, and single-investment valuation entry for an existing household and investment set. Batch valuation and correction history surfaces are implemented on the EPIC 2 dependency branch; charts remain future work. Offline financial-data behavior is intentionally deferred.
 
 ## Local setup
 
@@ -41,6 +41,7 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 | `npm run typecheck` | Generate Next.js route types and run strict TypeScript checks |
 | `npm test` | Run the unit tests once |
 | `npm run test:watch` | Watch unit tests during development |
+| `npm run test:e2e` | Run focused desktop and iPhone-class browser workflows against a disposable PostgreSQL database |
 | `npm run check` | Run lint, type checks, tests, and production build in order |
 | `npm run db:up` | Start local PostgreSQL with Docker Compose and wait for readiness |
 | `npm run db:down` | Stop local PostgreSQL, retaining its data volume |
@@ -52,6 +53,8 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 | `npm run test:db` | Test migrations and connections in a newly created disposable database |
 
 Run `npm run check` and `git diff --check` before handing off changes, plus `npm run test:db` when changing persistence or migrations. Unit tests use Vitest's Node environment and cover the active/closed entry policy and database configuration. Database tests are separate so everyday UI/domain development needs no database.
+
+Browser workflow tests require a local PostgreSQL maintenance connection in `TEST_DATABASE_URL` (for example the disposable Compose service's `postgres` database) and `npx playwright install chromium`. Run `npm run test:e2e`. The runner accepts only a loopback database host, creates and removes its own uniquely named database, migrates it, and seeds synthetic demo records. It starts a local Next.js server with a test-only password and signing secret; no production credentials or private data are needed.
 
 See [architecture](docs/architecture.md#responsibility-boundaries) for the source layout and dependency direction, and [personal-app scope](docs/architecture.md#personal-app-scope) for implementation tradeoffs.
 
@@ -105,7 +108,7 @@ TEST_DATABASE_URL=postgresql://equinox:<URL-encoded-local-password>@127.0.0.1:54
 
 Then run `npm run test:db`. The role must have `CREATEDB` permission (the Compose role already does). Tests create a fresh `equinox_test_*` database, use the same migration runner as the CLI, verify reapplication, close connections, and drop only that generated database. They never reset the database named in `DATABASE_URL` or the maintenance connection. A forcibly interrupted run can leave its generated test database for manual cleanup.
 
-CI supplies `TEST_DATABASE_URL` and `DATABASE_URL` against its ephemeral PostgreSQL 18 service, runs `npm ci`, `npm run check`, `npm run db:migrate`, and `npm run test:db`. To exercise the migration CLI separately, supply `DATABASE_URL` for an empty application database and run `npm run db:migrate`. No provider SDK or Docker-in-Docker is required. Test configuration follows Next.js conventions and does not load `.env.local`; `.env.test.local` and shell variables keep the test target explicit.
+CI supplies `TEST_DATABASE_URL` and `DATABASE_URL` against its ephemeral PostgreSQL 18 service, runs `npm ci`, `npm run check`, `npm run db:migrate`, and `npm run test:db`. A separate browser job runs Playwright against its own disposable PostgreSQL service using only synthetic data. To exercise the migration CLI separately, supply `DATABASE_URL` for an empty application database and run `npm run db:migrate`. No provider SDK or Docker-in-Docker is required. Test configuration follows Next.js conventions and does not load `.env.local`; `.env.test.local` and shell variables keep the test target explicit.
 
 ## Data safety
 
