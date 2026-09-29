@@ -11,12 +11,16 @@ type RowInput = { grossValue: string; debt: string; operation: "create" | "repla
 const blank: RowInput = { grossValue: "", debt: "", operation: "create" };
 const subscribe = () => () => {};
 
-type EmptyStateProps = { loading: boolean; loadFailed: boolean; investmentCount: number };
+type EmptyStateProps = { hasDate: boolean; loading: boolean; loadFailed: boolean; investmentCount: number };
 
-export function BatchEmptyState({ loading, loadFailed, investmentCount }: EmptyStateProps) {
-  return !loading && !loadFailed && investmentCount === 0
+export function BatchEmptyState({ hasDate, loading, loadFailed, investmentCount }: EmptyStateProps) {
+  return hasDate && !loading && !loadFailed && investmentCount === 0
     ? <p className="entry-muted">No active investments are available for this date.</p>
     : null;
+}
+
+export function BatchSaveNotice({ message }: { message: string }) {
+  return message ? <p role="status" className="entry-muted">{message}</p> : null;
 }
 
 function today() {
@@ -37,6 +41,7 @@ export function BatchForm() {
   const [inputs, setInputs] = useState<Record<string, RowInput>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -60,11 +65,13 @@ export function BatchForm() {
   function update(id: string, change: Partial<RowInput>) {
     setInputs((current) => ({ ...current, [id]: { ...(current[id] ?? blank), ...change } }));
     setErrors((current) => { const next = { ...current }; delete next[id]; return next; });
+    setSavedMessage("");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (loading || saving) return;
+    setSavedMessage("");
     const rows = investments.flatMap((investment) => {
       const input = inputs[investment.id] ?? blank;
       return input.grossValue.trim() || input.debt.trim()
@@ -88,7 +95,8 @@ export function BatchForm() {
         setErrors(body.rowErrors ?? {});
         setMessage(body.formError ?? "Review the highlighted rows. No marks were saved.");
       } else {
-        setInputs({}); setMessage(`${rows.length} valuation ${rows.length === 1 ? "mark" : "marks"} saved for ${selectedDate}.`);
+        setInputs({}); setMessage("");
+        setSavedMessage(`${rows.length} valuation ${rows.length === 1 ? "mark" : "marks"} saved for ${selectedDate}.`);
         setLoadFailed(false); setLoading(true); setRefresh((value) => value + 1);
       }
     } catch { setMessage("Unable to save marks. Your entries remain here."); }
@@ -100,11 +108,13 @@ export function BatchForm() {
       <input id="batch-date" type="date" value={selectedDate} required onChange={(event) => {
         if (Object.values(inputs).some((input) => input.grossValue || input.debt) &&
           !window.confirm("Changing the date clears entered marks. Continue?")) return;
-        setDate(event.target.value); setInputs({}); setErrors({}); setInvestments([]); setLoadFailed(false); setLoading(true); setMessage("");
+        const nextDate = event.target.value;
+        setDate(nextDate); setInputs({}); setErrors({}); setInvestments([]); setLoadFailed(false);
+        setLoading(Boolean(nextDate)); setMessage(""); setSavedMessage("");
       }} /></div>
     <p className="entry-muted">Active investments appear in a stable order. Blank rows are skipped. All entered rows save together.</p>
     {loading && <p role="status">Loading investments and marks…</p>}
-    <BatchEmptyState loading={loading} loadFailed={loadFailed} investmentCount={investments.length} />
+    <BatchEmptyState hasDate={Boolean(selectedDate)} loading={loading} loadFailed={loadFailed} investmentCount={investments.length} />
     <div className="batch-list">{investments.map((investment) => {
       const input = inputs[investment.id] ?? blank;
       let net: string | null = null;
@@ -139,6 +149,7 @@ export function BatchForm() {
       </section>;
     })}</div>
     {message && <p role="status" className={Object.keys(errors).length ? "form-error" : "entry-muted"}>{message}</p>}
+    <BatchSaveNotice message={savedMessage} />
     <div className="entry-actions"><button className="primary-button" type="submit" disabled={loading || saving || investments.length === 0}>
       {saving ? "Saving…" : "Save entered marks"}</button><Link href="/add">All actions</Link></div>
   </form>;
