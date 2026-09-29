@@ -6,9 +6,29 @@ import type { InvestmentOption, StoredMark, StoredMovement } from "@/application
 type History = { movements: StoredMovement[]; marks: Array<StoredMark & { netValue: string }> };
 type Item = { kind: "valuation"; date: string; mark: History["marks"][number] } |
   { kind: StoredMovement["kind"]; date: string; movement: StoredMovement };
-type Draft = { kind: string; investmentId: string; actionId: string; originalAsOfDate: string;
+type Draft = { kind: string; investmentId: string; actionId: string; originalAsOfDate: string; originalEffectiveDate: string;
   date: string; amount: string; grossValue: string; debt: string; sourceInvestmentId: string;
   destinationInvestmentId: string; targetInvestmentId: string; notes: string; sourceReference: string };
+
+type DeletionEntry = Pick<Draft, "kind" | "originalAsOfDate" | "originalEffectiveDate" | "date">;
+
+export function deletionConfirmation(draft: DeletionEntry) {
+  return draft.kind === "transfer"
+    ? "Delete this entire transfer, including both investment movements?"
+    : draft.kind === "valuation" ? `Delete the valuation mark dated ${draft.originalAsOfDate}?`
+      : `Delete this ${draft.kind} dated ${draft.originalEffectiveDate}?`;
+}
+
+type EmptyStatesProps = { loading: boolean; loadFailed: boolean; selectedId: string; itemCount: number; investmentCount: number };
+
+export function HistoryEmptyStates({ loading, loadFailed, selectedId, itemCount, investmentCount }: EmptyStatesProps) {
+  return <>
+    {selectedId && !loading && !loadFailed && itemCount === 0 &&
+      <p className="entry-muted">No actions or valuation marks are recorded for this investment.</p>}
+    {!loading && !loadFailed && !selectedId && investmentCount === 0 &&
+      <p className="entry-muted">No investments are available yet.</p>}
+  </>;
+}
 function money(value: string) {
   const negative = value.startsWith("-");
   const [whole, fraction] = value.replace("-", "").split(".");
@@ -21,6 +41,7 @@ export function HistoryPanel() {
   const [history, setHistory] = useState<History | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -34,8 +55,8 @@ export function HistoryPanel() {
         if (!response.ok) throw new Error(body.formError);
         return body as { investments: InvestmentOption[]; history: History | null };
       })
-      .then((body) => { if (!controller.signal.aborted) { setInvestments(body.investments); setHistory(body.history); setMessage(""); } })
-      .catch(() => { if (!controller.signal.aborted) setMessage("Unable to load history. Try again."); })
+      .then((body) => { if (!controller.signal.aborted) { setInvestments(body.investments); setHistory(body.history); setLoadFailed(false); setMessage(""); } })
+      .catch(() => { if (!controller.signal.aborted) { setLoadFailed(true); setMessage("Unable to load history. Try again."); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [selectedId, refresh]);
@@ -48,13 +69,13 @@ export function HistoryPanel() {
 
   function edit(item: Item) {
     if (item.kind === "valuation") {
-      setDraft({ kind: "valuation", investmentId: selectedId, actionId: "", originalAsOfDate: item.mark.asOfDate,
+      setDraft({ kind: "valuation", investmentId: selectedId, actionId: "", originalAsOfDate: item.mark.asOfDate, originalEffectiveDate: "",
         date: item.mark.asOfDate, amount: "", grossValue: item.mark.grossValue, debt: item.mark.debt,
         sourceInvestmentId: "", destinationInvestmentId: "", targetInvestmentId: selectedId,
         notes: item.mark.notes ?? "", sourceReference: item.mark.sourceReference ?? "" });
     } else {
       const movement = item.movement;
-      setDraft({ kind: movement.kind, investmentId: selectedId, actionId: movement.actionId, originalAsOfDate: "",
+      setDraft({ kind: movement.kind, investmentId: selectedId, actionId: movement.actionId, originalAsOfDate: "", originalEffectiveDate: movement.effectiveDate,
         date: movement.effectiveDate, amount: movement.amount, grossValue: "", debt: "",
         sourceInvestmentId: movement.kind === "transfer" && movement.role === "destination"
           ? movement.counterpartyInvestmentId ?? "" : selectedId,
@@ -71,17 +92,14 @@ export function HistoryPanel() {
 
   async function mutate(remove: boolean) {
     if (!draft || busy) return;
-    if (remove && !window.confirm(draft.kind === "transfer"
-      ? "Delete this entire transfer, including both investment movements?"
-      : draft.kind === "valuation" ? `Delete the valuation mark dated ${draft.originalAsOfDate}?`
-        : `Delete this ${draft.kind} dated ${draft.date}?`)) return;
+    if (remove && !window.confirm(deletionConfirmation(draft))) return;
     setBusy(true); setMessage("");
     try {
       const response = await fetch("/api/history", { method: remove ? "DELETE" : "PATCH",
         headers: { "content-type": "application/json" }, body: JSON.stringify(draft) });
       const body = await response.json();
       if (!response.ok) { setMessage(body.formError ?? "Unable to change this entry."); return; }
-      setDraft(null); setHistory(null); setLoading(true); setRefresh((value) => value + 1);
+      setDraft(null); setHistory(null); setLoadFailed(false); setLoading(true); setRefresh((value) => value + 1);
     } catch { setMessage("Unable to change this entry. Please try again."); }
     finally { setBusy(false); }
   }
@@ -89,11 +107,12 @@ export function HistoryPanel() {
   return <div className="history-panel">
     <div className="entry-field history-picker"><label htmlFor="history-investment">Investment</label>
       <select id="history-investment" value={selectedId} onChange={(event) => {
-        setSelectedId(event.target.value); setDraft(null); setHistory(null); setLoading(true); setMessage("");
+        setSelectedId(event.target.value); setDraft(null); setHistory(null); setLoadFailed(false); setLoading(true); setMessage("");
       }}><option value="">Choose an investment</option>{investments.map((investment) =>
         <option key={investment.id} value={investment.id}>{investment.name}{investment.status === "closed" ? " (closed)" : ""}</option>)}</select></div>
     {loading && <p role="status">Loading history…</p>}
-    {selectedId && !loading && items.length === 0 && <p className="entry-muted">No actions or valuation marks are recorded for this investment.</p>}
+    <HistoryEmptyStates loading={loading} loadFailed={loadFailed} selectedId={selectedId}
+      itemCount={items.length} investmentCount={investments.length} />
     <div className="history-list">{items.map((item) => {
       const mark = item.kind === "valuation";
       const key = mark ? `mark-${item.mark.id}` : `action-${item.movement.actionId}`;
@@ -146,6 +165,5 @@ export function HistoryPanel() {
         <button className="text-button" type="button" onClick={() => { setDraft(null); setMessage(""); }}>Cancel</button></div>
     </form>}
     {message && <p role="alert" className="form-error">{message}</p>}
-    {!loading && !selectedId && investments.length === 0 && <p className="entry-muted">No investments are available yet.</p>}
   </div>;
 }

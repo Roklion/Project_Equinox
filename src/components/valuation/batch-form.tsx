@@ -10,6 +10,15 @@ type InvestmentRow = InvestmentOption & { existing: Mark | null; previous: Mark 
 type RowInput = { grossValue: string; debt: string; operation: "create" | "replace" };
 const blank: RowInput = { grossValue: "", debt: "", operation: "create" };
 const subscribe = () => () => {};
+
+type EmptyStateProps = { loading: boolean; loadFailed: boolean; investmentCount: number };
+
+export function BatchEmptyState({ loading, loadFailed, investmentCount }: EmptyStateProps) {
+  return !loading && !loadFailed && investmentCount === 0
+    ? <p className="entry-muted">No active investments are available for this date.</p>
+    : null;
+}
+
 function today() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -29,6 +38,7 @@ export function BatchForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -41,8 +51,8 @@ export function BatchForm() {
         if (!response.ok) throw new Error(body.formError);
         return body as { investments: InvestmentRow[] };
       })
-      .then((body) => { if (!controller.signal.aborted) { setInvestments(body.investments); setMessage(""); } })
-      .catch(() => { if (!controller.signal.aborted) setMessage("Unable to load valuation context. Try again."); })
+      .then((body) => { if (!controller.signal.aborted) { setInvestments(body.investments); setLoadFailed(false); setMessage(""); } })
+      .catch(() => { if (!controller.signal.aborted) { setLoadFailed(true); setMessage("Unable to load valuation context. Try again."); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [selectedDate, refresh]);
@@ -79,7 +89,7 @@ export function BatchForm() {
         setMessage(body.formError ?? "Review the highlighted rows. No marks were saved.");
       } else {
         setInputs({}); setMessage(`${rows.length} valuation ${rows.length === 1 ? "mark" : "marks"} saved for ${selectedDate}.`);
-        setLoading(true); setRefresh((value) => value + 1);
+        setLoadFailed(false); setLoading(true); setRefresh((value) => value + 1);
       }
     } catch { setMessage("Unable to save marks. Your entries remain here."); }
     finally { setSaving(false); }
@@ -90,11 +100,11 @@ export function BatchForm() {
       <input id="batch-date" type="date" value={selectedDate} required onChange={(event) => {
         if (Object.values(inputs).some((input) => input.grossValue || input.debt) &&
           !window.confirm("Changing the date clears entered marks. Continue?")) return;
-        setDate(event.target.value); setInputs({}); setErrors({}); setInvestments([]); setLoading(true); setMessage("");
+        setDate(event.target.value); setInputs({}); setErrors({}); setInvestments([]); setLoadFailed(false); setLoading(true); setMessage("");
       }} /></div>
     <p className="entry-muted">Active investments appear in a stable order. Blank rows are skipped. All entered rows save together.</p>
     {loading && <p role="status">Loading investments and marks…</p>}
-    {!loading && investments.length === 0 && <p className="entry-muted">No active investments are available for this date.</p>}
+    <BatchEmptyState loading={loading} loadFailed={loadFailed} investmentCount={investments.length} />
     <div className="batch-list">{investments.map((investment) => {
       const input = inputs[investment.id] ?? blank;
       let net: string | null = null;
