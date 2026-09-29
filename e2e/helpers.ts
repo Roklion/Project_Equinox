@@ -4,7 +4,12 @@ export async function signIn(page: Page) {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel("App password").fill("synthetic-equinox-test-password");
+  const loginResponsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Sign in" }).click();
+  const loginResponse = await loginResponsePromise;
+  expect(loginResponse.status(), "synthetic browser-test login should succeed").toBe(200);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "Keep your investment story current." })).toBeVisible();
 }
 
