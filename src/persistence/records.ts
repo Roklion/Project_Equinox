@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
 import { assertCalendarDate, formatCents, parseCents, type Provenance } from "@/domain/financial";
 import { WorkflowError } from "@/application/errors";
-import type { EditExternalAction, EditTransfer, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement } from "@/application/ports";
+import type { EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
   accountTypes, actions, assetClasses, institutions, investmentOwners, investments, liquidities, movements, taxStatuses, valuationMarks,
@@ -138,6 +138,28 @@ export async function replaceValuationMark(db: Database, input: ReplaceValuation
   )).returning();
   if (!mark) throw new WorkflowError("mark_not_found");
   return mark;
+}
+
+/** Correct a mark, including its date, without replacing a different mark on the new date. */
+export async function editValuationMark(db: Database, input: EditValuationMark) {
+  return db.transaction(async (tx) => {
+    await requireValidActivityDate(tx, input.householdId, input.investmentId, input.asOfDate);
+    const whereMark = and(eq(valuationMarks.householdId, input.householdId),
+      eq(valuationMarks.investmentId, input.investmentId));
+    const [original] = await tx.select({ id: valuationMarks.id }).from(valuationMarks)
+      .where(and(whereMark, eq(valuationMarks.asOfDate, input.originalAsOfDate)));
+    if (!original) throw new WorkflowError("mark_not_found");
+    if (input.asOfDate !== input.originalAsOfDate) {
+      const [collision] = await tx.select({ id: valuationMarks.id }).from(valuationMarks)
+        .where(and(whereMark, eq(valuationMarks.asOfDate, input.asOfDate)));
+      if (collision) throw new WorkflowError("mark_already_exists");
+    }
+    const [mark] = await tx.update(valuationMarks).set({ asOfDate: input.asOfDate,
+      grossValue: exactAmount(input.grossValue, true), debt: exactAmount(input.debt ?? "0", true),
+      source: input.source, sourceReference: input.sourceReference, notes: input.notes,
+    }).where(and(whereMark, eq(valuationMarks.id, original.id))).returning();
+    return mark;
+  });
 }
 
 async function requireAction(tx: Transaction, householdId: string, actionId: string, kinds: string[]) {
@@ -294,6 +316,19 @@ export async function getEligibleInvestments(db: Database, householdId: string, 
       gte(investments.closedOn, asOfDate))))).orderBy(asc(investments.name), asc(investments.id));
 }
 
+export async function getInvestments(db: Database, householdId: string) {
+  return db.select({ id: investments.id, name: investments.name, status: investments.status,
+    closedOn: investments.closedOn, assetClass: assetClasses.label, accountType: accountTypes.label,
+    taxStatus: taxStatuses.label, liquidity: liquidities.label, institution: institutions.label,
+  }).from(investments)
+    .leftJoin(assetClasses, and(eq(assetClasses.householdId, investments.householdId), eq(assetClasses.id, investments.assetClassId)))
+    .leftJoin(accountTypes, and(eq(accountTypes.householdId, investments.householdId), eq(accountTypes.id, investments.accountTypeId)))
+    .leftJoin(taxStatuses, and(eq(taxStatuses.householdId, investments.householdId), eq(taxStatuses.id, investments.taxStatusId)))
+    .leftJoin(liquidities, and(eq(liquidities.householdId, investments.householdId), eq(liquidities.id, investments.liquidityId)))
+    .leftJoin(institutions, and(eq(institutions.householdId, investments.householdId), eq(institutions.id, investments.institutionId)))
+    .where(eq(investments.householdId, householdId)).orderBy(asc(investments.name), asc(investments.id));
+}
+
 export async function getLatestValuationMarks(db: Database, householdId: string) {
   return db.selectDistinctOn([valuationMarks.investmentId], { investmentId: valuationMarks.investmentId, id: valuationMarks.id,
     asOfDate: valuationMarks.asOfDate, grossValue: valuationMarks.grossValue, debt: valuationMarks.debt,
@@ -353,10 +388,13 @@ export function createPostgresPortfolioRepository(db: Database): PortfolioReposi
     deleteTransfer: ({ householdId, actionId }) => deleteTransfer(db, householdId, actionId),
     recordValuationMark: (input) => recordValuationMark(db, input),
     replaceValuationMark: (input) => replaceValuationMark(db, input),
+    editValuationMark: (input) => editValuationMark(db, input),
     deleteValuationMark: (householdId, investmentId, asOfDate) => deleteValuationMark(db, householdId, investmentId, asOfDate),
     saveValuationBatch: (input) => saveValuationBatch(db, input),
     getEligibleInvestments: async (householdId, asOfDate) =>
       await getEligibleInvestments(db, householdId, asOfDate) as Awaited<ReturnType<PortfolioRepository["getEligibleInvestments"]>>,
+    getInvestments: async (householdId) =>
+      await getInvestments(db, householdId) as Awaited<ReturnType<PortfolioRepository["getInvestments"]>>,
     getLatestValuationMarks: (householdId) => getLatestValuationMarks(db, householdId),
     getValuationContext: (householdId, investmentId, asOfDate) => getValuationContext(db, householdId, investmentId, asOfDate),
     getInvestmentHistory: (householdId, investmentId) => getInvestmentHistory(db, householdId, investmentId),

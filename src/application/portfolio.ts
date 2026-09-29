@@ -1,6 +1,6 @@
 import { assertCalendarDate, formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
 import { WorkflowError } from "./errors";
-import type { CreateInvestment, EditExternalAction, EditTransfer, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
+import type { CreateInvestment, EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
 
 function calendarDate(value: string) {
   try { assertCalendarDate(value); } catch { throw new WorkflowError("invalid_date"); }
@@ -70,6 +70,12 @@ export function createPortfolioService(repository: PortfolioRepository) {
     replaceValuationMark(input: ReplaceValuationMark) {
       return repository.replaceValuationMark(validatedReplacement(input));
     },
+    editValuationMark(input: EditValuationMark) {
+      calendarDate(input.originalAsOfDate);
+      calendarDate(input.asOfDate);
+      return repository.editValuationMark({ ...input, grossValue: nonnegativeAmount(input.grossValue),
+        debt: nonnegativeAmount(input.debt ?? "0") });
+    },
     deleteValuationMark(householdId: string, investmentId: string, asOfDate: string) {
       calendarDate(asOfDate);
       return repository.deleteValuationMark(householdId, investmentId, asOfDate);
@@ -90,6 +96,9 @@ export function createPortfolioService(repository: PortfolioRepository) {
     getEligibleInvestments(householdId: string, asOfDate: string) {
       calendarDate(asOfDate);
       return repository.getEligibleInvestments(householdId, asOfDate);
+    },
+    getInvestments(householdId: string) {
+      return repository.getInvestments(householdId);
     },
     async getLatestValuationMarks(householdId: string) {
       const marks = await repository.getLatestValuationMarks(householdId);

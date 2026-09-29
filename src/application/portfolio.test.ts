@@ -14,9 +14,11 @@ function fakeRepository() {
     deleteTransfer: vi.fn(async () => {}),
     recordValuationMark: vi.fn(async () => ({ id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "0.00" })),
     replaceValuationMark: vi.fn(async () => ({ id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "2.00" })),
+    editValuationMark: vi.fn(async () => ({ id: "mark-a", asOfDate: "2026-03-01", grossValue: "1.00", debt: "2.00" })),
     deleteValuationMark: vi.fn(async () => {}),
     saveValuationBatch: vi.fn(async () => []),
     getEligibleInvestments: vi.fn(async () => []),
+    getInvestments: vi.fn(async () => []),
     getLatestValuationMarks: vi.fn(async () => []),
     getValuationContext: vi.fn(async () => ({ existing: null, previous: null })),
     getInvestmentHistory: vi.fn(async () => ({ movements: [], marks: [
@@ -26,6 +28,18 @@ function fakeRepository() {
 }
 
 describe("portfolio application service", () => {
+  it("validates valuation date corrections and preserves negative derived equity", async () => {
+    const repository = fakeRepository();
+    const service = createPortfolioService(repository);
+    await expect(service.editValuationMark({ householdId: "home", investmentId: "investment-a",
+      originalAsOfDate: "2026-09-01", asOfDate: "2026-09-02", grossValue: "10", debt: "20" }))
+      .resolves.toMatchObject({ id: "mark-a" });
+    expect(repository.editValuationMark).toHaveBeenCalledWith(expect.objectContaining({
+      originalAsOfDate: "2026-09-01", asOfDate: "2026-09-02", grossValue: "10.00", debt: "20.00",
+    }));
+    expect(() => service.editValuationMark({ householdId: "home", investmentId: "investment-a",
+      originalAsOfDate: "2026-02-30", asOfDate: "2026-09-02", grossValue: "10", debt: "20" })).toThrow();
+  });
   it("validates commands before touching persistence and keeps exact day/cent values", async () => {
     const repository = fakeRepository();
     const service = createPortfolioService(repository);
