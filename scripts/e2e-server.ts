@@ -1,3 +1,4 @@
+import nextEnv from "@next/env";
 import { randomUUID, scryptSync } from "node:crypto";
 import { spawn } from "node:child_process";
 import { Client } from "pg";
@@ -5,6 +6,9 @@ import { createDatabase } from "../src/persistence/database";
 import { assertLoopbackDatabaseUrl } from "../src/persistence/demo-seed-config";
 import { migrateDatabase } from "../src/persistence/migrate";
 import { seedDemoPortfolio } from "../src/persistence/demo-seed";
+
+Object.assign(process.env, { NODE_ENV: "test" });
+nextEnv.loadEnvConfig(process.cwd());
 
 const maintenanceUrl = process.env.TEST_DATABASE_URL;
 if (!maintenanceUrl) throw new Error("TEST_DATABASE_URL is required for browser tests.");
