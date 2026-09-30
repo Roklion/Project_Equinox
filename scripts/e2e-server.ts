@@ -62,7 +62,11 @@ async function main() {
       void cleanup().then(() => { process.exitCode = code || 1; });
     });
   } catch (error) {
-    await cleanup();
+    try {
+      await cleanup();
+    } catch {
+      console.error("Browser test cleanup failed; verify disposable database cleanup before retrying.");
+    }
     throw error;
   }
 }
