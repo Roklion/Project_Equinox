@@ -67,12 +67,13 @@ export function BatchFields({ investment, input, rowError, onUpdate }: BatchFiel
         value={input.debt} aria-invalid={rowError?.field === "debt" || rowError?.field === "amounts"}
         aria-describedby={rowError?.field === "debt" || rowError?.field === "amounts" ? errorId : undefined}
         onChange={(event) => onUpdate(investment.id, { debt: event.target.value })} />{fieldError("debt")}</div>
-    {(investment.existing || rowError?.field === "operation") && <div className="entry-field"><label htmlFor={`operation-${investment.id}`}>Save as</label>
+    {investment.existing && <div className="entry-field"><label htmlFor={`operation-${investment.id}`}>Save as</label>
       <select id={`operation-${investment.id}`} value={input.operation} onChange={(event) => onUpdate(investment.id,
         { operation: event.target.value as RowInput["operation"] })} aria-invalid={rowError?.field === "operation"}
         aria-describedby={rowError?.field === "operation" ? errorId : undefined}>
         <option value="create">Choose correction</option><option value="replace">Correct existing mark</option>
-      </select>{fieldError("operation")}</div>}</div>;
+      </select>{fieldError("operation")}</div>}
+    {!investment.existing && fieldError("operation")}</div>;
 }
 
 function today() {
@@ -155,8 +156,12 @@ export function BatchForm() {
         headers: { "content-type": "application/json" }, body: JSON.stringify({ date: selectedDate, rows }) });
       const body = await response.json();
       if (!response.ok) {
-        setErrors(normalizeRowErrors(body.rowErrors, rows));
+        const rowErrors = normalizeRowErrors(body.rowErrors, rows);
+        setErrors(rowErrors);
         setMessage(body.formError ?? "Review the highlighted rows. No marks were saved.");
+        if (investments.some((investment) => !investment.existing && rowErrors[investment.id]?.field === "operation")) {
+          setLoading(true); setRefresh((value) => value + 1);
+        }
       } else {
         setInputs({}); setMessage("");
         setSavedMessage(`${rows.length} valuation ${rows.length === 1 ? "mark" : "marks"} saved for ${selectedDate}.`);

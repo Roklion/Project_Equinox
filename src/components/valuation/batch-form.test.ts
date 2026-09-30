@@ -58,7 +58,7 @@ describe("batch valuation field errors", () => {
     expect(html.indexOf('id="operation-example-account"')).toBeLessThan(html.indexOf("Choose correction explicitly for the existing mark."));
   });
 
-  it("keeps the correction choice available when the server finds a newly existing mark", () => {
+  it("withholds correction until the newly existing mark context is loaded", () => {
     const html = renderToStaticMarkup(createElement(BatchFields, {
       investment: { ...sampleInvestment, existing: null },
       input: { grossValue: "4444.50", debt: "", operation: "create" },
@@ -66,7 +66,19 @@ describe("batch valuation field errors", () => {
       onUpdate: () => {},
     }));
 
-    expect(html).toContain('id="operation-example-account"');
-    expect(html).toContain('aria-invalid="true"');
+    expect(html).not.toContain('id="operation-example-account"');
+    expect(html).toContain("A mark already exists on this date. Choose correction explicitly.");
+    expect(html).toContain('role="alert"');
+  });
+
+  it("shows retained debt when refreshed context makes correction available", () => {
+    const html = renderToStaticMarkup(createElement(BatchFields, {
+      investment: sampleInvestment,
+      input: { grossValue: "4444.50", debt: "", operation: "replace" },
+      onUpdate: () => {},
+    }));
+
+    expect(html).toContain('placeholder="Keep 25.00"');
+    expect(html).toContain('value="replace" selected=""');
   });
 });
