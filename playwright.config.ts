@@ -10,8 +10,8 @@ export default defineConfig({
   reporter: "list",
   use: { baseURL: "http://localhost:3100", trace: "retain-on-failure" },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testMatch: ["desktop.spec.ts", "navigation.spec.ts"] },
-    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" }, testMatch: ["iphone.spec.ts", "navigation.spec.ts"] },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testMatch: ["desktop.spec.ts", "navigation.spec.ts", "investment-management.spec.ts", "investments.spec.ts"] },
+    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" }, testMatch: ["iphone.spec.ts", "navigation.spec.ts", "investment-management.spec.ts", "investments.spec.ts"] },
   ],
   webServer: {
     command: "node --conditions=react-server --import tsx scripts/e2e-server.ts",

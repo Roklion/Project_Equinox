@@ -71,6 +71,14 @@ Reusable value, delta, date, investment-row, and history components should compo
 
 ## Charts
 
+### Investments browse and detail
+
+Investments defaults to active records, with explicit closed-only and combined views. Rows show authoritative NAV, reporting date, effective mark date/age, lifecycle and selected asset-class/institution context. Missing marks remain unavailable. Filters use stable asset-class, institution, owner and custom-group IDs; overlapping groups filter rather than create additive segments. Ordering is display name then stable identity. The editable reporting date initially uses today's UTC calendar date, always shown explicitly.
+
+Investment detail leads with NAV, selected-period change, reporting date and mark age, followed by financial Add and Manage entry points. Closed records show the close date and historical correction access without ordinary Add. The default performance period is year to date, with editable start/end dates; since-inception P&L and returns are labeled separately. Both use authoritative investment-boundary analytics, including crossing transfer flows. Detail composes the shared chart frame, value/debt breakdown, cash-flow/performance and returns components. Interactive trend rendering belongs to the separate chart ticket; the frame links to actual dated valuation history while awaiting integration.
+
+Desktop uses a wider financial column beside ownership/classification disclosure. iPhone stacks these sections and filters, preserving dates and value signs. Metadata filters and ownership detail use native progressive disclosure, keeping the ordinary browse experience focused on values. Browse/detail navigation retains the selected reporting date. Action/valuation history links pass the investment identity into the existing EPIC 2 history/correction surface; detail introduces no parallel mutation UI.
+
 Apache ECharts is the planned charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
 
 ### Chart hierarchy

@@ -94,5 +94,7 @@ test("create, edit, and close an investment while preserving history", async ({ 
   await expect(page.getByRole("button", { name: "Close investment", exact: true })).toHaveCount(0);
   expect((await page.request.post("/api/entries", { headers: { origin }, data: { kind: "contribution", investmentId, date: "2026-02-03", amount: "1" } })).status()).toBe(409);
   await page.goto("/investments");
+  await page.getByLabel("Investments to show").selectOption("all");
+  await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page.getByRole("link", { name: `${name} renamed` })).toBeVisible();
 });
