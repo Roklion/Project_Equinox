@@ -40,6 +40,13 @@ test.describe("browser-local reporting date", () => {
     await page.getByLabel("Gross investment value").fill("12345.67");
     await page.getByRole("button", { name: "Save valuation mark" }).click();
     await expect(page.getByText("Valuation saved", { exact: true })).toBeVisible();
+    // A fresh direct browse visit must not propagate the UTC fallback as an explicit date.
+    await context.clearCookies({ name: "equinox-chart-date" });
+    await page.goto("/investments");
+    await expect(page.getByLabel("Reporting date")).toHaveValue("2027-01-02");
+    await page.getByRole("link", { name: "Sample Market Account", exact: true }).click();
+    await expect(page.getByLabel("Reporting date")).toHaveValue("2027-01-02");
+    await expect(page.getByRole("region", { name: "Value over time" }).locator(".headline-number")).toHaveText("$12,345.67");
     // Exercise recovery from a valid but stale reporting-date cookie as well.
     await context.addCookies([{ name: "equinox-chart-date", value: "2027-01-01", url: page.url() }]);
     await page.goto("/");

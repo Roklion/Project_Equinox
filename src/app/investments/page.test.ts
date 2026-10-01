@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAnalyticsService } from "@/application/analytics";
@@ -11,12 +12,13 @@ const mocked = vi.hoisted(() => ({ root: vi.fn(), chartDate: undefined as string
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => mocked.chartDate ? { value: mocked.chartDate } : undefined }) }));
 vi.mock("@/app/add/entry-data", () => ({ withAnalyticsService: mocked.root }));
 vi.mock("@/app/chart-data", () => ({ loadHistoricalCharts: vi.fn(async () => null) }));
+vi.mock("@/components/charts/reporting-date", () => ({ ChartReportingDate: () => createElement("span", null, "browser-date-sync") }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not-found"); } }));
 const analytics = createAnalyticsService({
   getSnapshotSources: async () => sources(), getCashFlowSources: async () => sources(),
 });
 function sources() { const sources = canonicalSources(); sources.investments.push(investment(ids.missing, "Unvalued example")); return sources; }
-beforeEach(() => { mocked.chartDate = undefined; mocked.root.mockImplementation((run) => run({ householdId: "synthetic-household", analytics })); });
+beforeEach(() => { mocked.chartDate = endDate; mocked.root.mockImplementation((run) => run({ householdId: "synthetic-household", analytics })); });
 async function detail(id: string) {
   return renderToStaticMarkup(await InvestmentDetailPage({ params: Promise.resolve({ investmentId: id }),
     searchParams: Promise.resolve({ date: endDate, start: startDate }) }));
@@ -27,6 +29,18 @@ describe("live investment surface composition", () => {
     expect(page.props.children.at(-1).props.initialInvestmentId).toBe(ids.active);
     const repeated = await InvestmentHistoryPage({ searchParams: Promise.resolve({ investmentId: [ids.active, ids.closed] }) });
     expect(repeated.props.children.at(-1).props.initialInvestmentId).toBeUndefined();
+  });
+  it("waits for the browser date before generating default browse links", async () => {
+    mocked.chartDate = undefined;
+    mocked.root.mockClear();
+    const html = renderToStaticMarkup(await InvestmentsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Preparing your local reporting date");
+    expect(html).toContain("browser-date-sync");
+    expect(html).not.toContain("?date=");
+    expect(mocked.root).not.toHaveBeenCalled();
+    const explicit = renderToStaticMarkup(await InvestmentsPage({ searchParams: Promise.resolve({ date: endDate }) }));
+    expect(explicit).not.toContain("browser-date-sync");
+    expect(explicit).toContain("?date=" + endDate);
   });
   it("keeps empty, filtered-empty and invalid date states explicit", async () => {
     mocked.root.mockResolvedValue(null);
