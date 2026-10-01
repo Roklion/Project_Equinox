@@ -97,4 +97,10 @@ test("create, edit, and close an investment while preserving history", async ({ 
   await page.getByLabel("Investments to show").selectOption("all");
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page.getByRole("link", { name: `${name} renamed` })).toBeVisible();
+  await page.getByRole("link", { name: `${name} renamed` }).click();
+  await page.getByRole("link", { name: "View history and corrections" }).click();
+  await expect(page.getByLabel("Investment", { exact: true })).toHaveValue(investmentId);
+  await expect(page.locator("article.history-item")).toHaveCount(2);
+  await page.goto("/investments/history");
+  await expect(page.getByLabel("Investment", { exact: true })).toHaveValue("");
 });
