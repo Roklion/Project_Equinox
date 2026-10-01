@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { loadHistoricalCharts } from "@/app/chart-data";
 import { notFound } from "next/navigation";
 import { withEntryService } from "@/app/add/entry-data";
 import { MetadataRows, SurfaceState } from "@/components/financial/primitives";
@@ -16,11 +17,11 @@ export default async function InvestmentDetailPage({ params }: { params: Promise
       action={<Link href={`/investments/${encodeURIComponent(investmentId)}`}>Try again</Link>}>Please try again.</SurfaceState></>;
   }
   if (!investment) notFound();
+  const charts = await loadHistoricalCharts({ investmentIds: [investment.id] });
   return <><div className="entry-topline"><Link href="/investments">← Investments</Link></div>
     <section className="page-heading"><p className="eyebrow">Investment detail</p><h1>{investment.name}</h1>
       <p>{investment.status === "closed" ? `Closed on ${investment.closedOn}` : "Active investment"}</p></section>
-    <SurfaceState kind="empty" title="Your investment detail is taking shape">
-      Financial summaries, charts, and investment management will arrive in later updates.</SurfaceState>
+    {charts}
     <section className="metadata-section"><h2>Classification</h2><MetadataRows rows={[
       { label: "Asset class", value: investment.assetClass }, { label: "Account type", value: investment.accountType },
       { label: "Tax status", value: investment.taxStatus }, { label: "Liquidity", value: investment.liquidity },

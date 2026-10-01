@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env.E2E_PORT ?? "3100";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 120_000,
@@ -8,14 +9,14 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "list",
-  use: { baseURL: "http://localhost:3100", trace: "retain-on-failure" },
+  use: { baseURL: "http://localhost:" + port, trace: "retain-on-failure" },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testMatch: ["desktop.spec.ts", "navigation.spec.ts"] },
-    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" }, testMatch: ["iphone.spec.ts", "navigation.spec.ts"] },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testMatch: ["desktop.spec.ts", "navigation.spec.ts", "historical-charts.spec.ts"] },
+    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" }, testMatch: ["iphone.spec.ts", "navigation.spec.ts", "historical-charts.spec.ts"] },
   ],
   webServer: {
     command: "node --conditions=react-server --import tsx scripts/e2e-server.ts",
-    url: "http://localhost:3100/login",
+    url: "http://localhost:" + port + "/login",
     reuseExistingServer: false,
     timeout: 120_000,
   },

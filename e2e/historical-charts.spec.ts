@@ -1,0 +1,21 @@
+import { expect, test } from "@playwright/test";
+import { signIn } from "./helpers";
+test("authenticated charts use persisted household and investment series", async ({ page }) => {
+  await signIn(page);
+  const trend = page.getByRole("region", { name: "Value over time" });
+  const composition = page.getByRole("region", { name: "Composition over time" });
+  await expect(trend.locator("svg")).toBeVisible();
+  await trend.getByLabel("Inspect recorded date").selectOption("2025-06-30");
+  await composition.getByLabel("Inspect recorded date").selectOption("2025-06-30");
+  await expect(trend.locator(".headline-number")).toHaveText("$20,250.00");
+  await expect(composition.locator(".headline-number")).toHaveText("$20,250.00");
+  await trend.getByLabel("Inspect recorded date").selectOption("2025-03-31");
+  await expect(trend.locator(".headline-number")).toHaveText("$18,700.00");
+  await composition.getByLabel("Group by").selectOption("ownerSet");
+  await expect(composition.locator(".chart-segments")).toContainText(/Owner A \+ Owner B|Owner B \+ Owner A/);
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Investments", exact: true }).click();
+  await page.getByRole("link", { name: "Sample Market Account", exact: true }).click();
+  await page.getByRole("region", { name: "Value over time" }).getByLabel("Inspect recorded date").selectOption("2025-06-30");
+  await expect(page.getByRole("region", { name: "Value over time" }).locator(".headline-number")).toHaveText("$9,400.00");
+  await expect(page.getByRole("region", { name: "Composition over time" }).locator(".chart-segments")).toContainText("Sample Market Account");
+});

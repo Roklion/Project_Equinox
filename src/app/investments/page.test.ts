@@ -10,6 +10,7 @@ vi.mock("@/app/add/entry-data", () => ({
   withEntryService: (run: (context: unknown) => unknown) => mocks.householdAvailable
     ? run({ householdId: "synthetic-household", service: { getInvestments: mocks.getInvestments } }) : null,
 }));
+vi.mock("@/app/chart-data", () => ({ loadHistoricalCharts: vi.fn(async () => null) }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not-found"); } }));
 
 const record: InvestmentOption = { id: "synthetic-investment", name: "Example investment", status: "closed",

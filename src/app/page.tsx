@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { SurfaceState } from "@/components/financial/primitives";
+import { loadHistoricalCharts } from "./chart-data";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+export default async function HomePage() {
+  const charts = await loadHistoricalCharts();
   return (
     <>
       <section className="page-heading" aria-labelledby="overview-title">
@@ -13,10 +15,7 @@ export default function HomePage() {
         <div className="entry-actions"><Link href="/valuations/batch">Batch valuation update</Link>
           <Link href="/investments/history">Investment history</Link></div>
       </section>
-      <SurfaceState kind="empty" title="Your overview is taking shape.">
-          Record entries, update several valuations, and review the history of each investment.
-          Value trends will appear here in a later update.
-      </SurfaceState>
+      {charts}
     </>
   );
 }

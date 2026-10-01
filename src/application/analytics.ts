@@ -2,12 +2,22 @@ import { calculateValueSeries, calculateCompositionSeries } from "@/domain/analy
 import { calculateReturns } from "@/domain/analytics/returns";
 import { assertPeriod, calculatePeriod, calculateInception } from "@/domain/analytics/cash-flow";
 import { assertCalendarDate } from "@/domain/financial";
-import { assertGroupingDimension, calculateSnapshot, groupSnapshot, type GroupingDimension, type SnapshotScope } from "@/domain/analytics/snapshot";
+import { assertGroupingDimension, calculateSnapshot, groupSnapshot, classificationDimensions, type GroupingDimension, type SnapshotScope } from "@/domain/analytics/snapshot";
 import { WorkflowError } from "./errors";
 import type { AnalyticsRepository } from "./analytics-ports";
 
 export function createAnalyticsService(repository: AnalyticsRepository) {
   return {
+    /** One source read keeps both complementary series and all grouping views aligned. */
+    async historicalSeries(householdId: string, startDate: string, endDate: string, scope: SnapshotScope = {}) {
+      try { assertPeriod(startDate, endDate); } catch { throw new WorkflowError("invalid_date"); }
+      const sources = await repository.getSnapshotSources(householdId, endDate);
+      const dimensions: GroupingDimension[] = ["investment", ...classificationDimensions, "ownerSet"];
+      const compositionSeries = Object.fromEntries(dimensions.map((dimension) =>
+        [dimension, calculateCompositionSeries(sources, startDate, endDate, dimension, scope)])) as
+        Record<GroupingDimension, ReturnType<typeof calculateCompositionSeries>>;
+      return { valueSeries: calculateValueSeries(sources, startDate, endDate, scope), compositionSeries };
+    },
     async valueSeries(householdId: string, startDate: string, endDate: string, scope: SnapshotScope = {}) {
       try { assertPeriod(startDate, endDate); } catch { throw new WorkflowError("invalid_date"); }
       const sources = await repository.getSnapshotSources(householdId, endDate);

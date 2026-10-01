@@ -71,7 +71,7 @@ Reusable value, delta, date, investment-row, and history components should compo
 
 ## Charts
 
-Apache ECharts is the planned charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
+Apache ECharts is the charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
 
 ### Chart hierarchy
 
@@ -85,11 +85,11 @@ The stacked composition chart should be able to group the same underlying invest
 - investment;
 - asset class;
 - account type;
-- owner;
+- owner-set bucket (joint owners remain one segment);
 - tax status where useful; and
-- custom group.
+- liquidity and institution.
 
-Additional grouping dimensions should reuse canonical classifications rather than creating chart-specific financial state.
+Custom groups filter reporting scopes; overlapping membership is never an additive stacking dimension. Additional grouping dimensions should reuse canonical classifications rather than creating chart-specific financial state.
 
 ### Chart behavior and styling
 
@@ -103,6 +103,20 @@ Additional grouping dimensions should reuse canonical classifications rather tha
 - When a selected point/date changes, reflect the important date/value context outside the tooltip where the surrounding surface benefits from it.
 
 On desktop, charts support hover and precise pointer inspection. On iPhone, they support touch scrubbing with a stable crosshair or selection marker, appropriately sized targets, and behavior that does not trap ordinary page scrolling. Small screens may simplify legends or move composition details into a drill-down surface rather than compressing unreadable labels.
+
+### Historical chart rendering contract
+
+The shared ValueTrendChart and CompositionChart consume the authoritative historical-series outputs. NAV is the default trend; gross value and investment-linked debt are optional measure controls. Grouping choices are restricted to supplied additive series: investment, asset class, account type, tax status, liquidity, institution, and owner set. Labels and stable bucket keys come from analytics.
+
+Both charts use an elapsed-calendar-time axis and unsmoothed steps between recorded snapshots. Dots identify actual observations; intermediate positions never create a selectable financial point. A single observation is a dot, and an empty range has an explicit message. All, one-year, and three-month ranges filter existing observations relative to the supplied range end, without generating endpoint observations.
+
+Incomplete aggregate points are gaps in every visual series, even when individual buckets are available. The selected summary displays the unavailable total, coverage counts, and a disclosure of each constituent's actual mark date and supplied age. Exact available bucket values remain inspectable below composition; missing valuations never become zero. An absent bucket has no scope members at that date and contributes no area; its detail reads "Not in scope on this date". A bucket's position and color remain stable across range changes, ordered by its canonical key.
+
+Composition uses stacked NAV areas only when the visible range has no negative segments. If any supplied segment is negative, the entire visible range uses separate step lines and an explicit explanation. This avoids implying that separate positive/negative stacks form one total boundary. Negative values and the supplied aggregate remain exact in the selected-date summary and labeled segment breakdown.
+
+Hover selects the nearest recorded date on desktop. Touch taps and horizontal drags select observations; the plot uses pan-y touch behavior so ordinary vertical scrolling remains available. A dashed crosshair retains the selected observation after pointer exit. A labeled native date selector provides keyboard and non-pointer inspection. All essential dates, values, coverage and segment labels remain outside the SVG. Date selection persists across range/group changes when present; otherwise it selects the latest remaining observation. No tooltip is required to obtain financial information.
+
+The neutral chart frame, as-of labels, exact-money formatting, controls and categorical CSS tokens reuse the shared financial presentation system. Chart headings stay in the surrounding frame rather than the plot renderer. Browser checks exercise the real React components and ECharts renderer with synthetic analytics, including Chromium phone touch emulation; physical iPhone Safari/PWA validation remains a device check.
 
 ## Responsive behavior
 
@@ -127,7 +141,6 @@ Likely reusable components include value summaries, metric cards, as-of labels, 
 ## Open design decisions
 
 - visual identity, palette, typography, and icon system;
-- chart behavior for sparse or irregular valuation marks;
 - density and interaction model for large investment lists; and
 - install and update prompts for the PWA; offline financial-data behavior requires a separate security and product decision.
 
