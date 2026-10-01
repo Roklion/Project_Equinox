@@ -124,3 +124,37 @@ test("batch failure is atomic, keeps inputs, and requires explicit replacement",
   await openHistory(page, "Sample Market Account");
   await expect(historyItem(page, "Valuation mark", "2026-04-11")).toContainText("$1,100.00");
 });
+
+test("a late batch conflict refreshes retained debt before correction", async ({ page, context }) => {
+  await page.goto("/valuations/batch");
+  await page.getByLabel("Shared as-of date").fill("2026-04-12");
+  const market = batchRow(page, "Sample Market Account");
+  await market.getByLabel("Gross value").fill("1100.00");
+  await expect(page.getByText("Loading investments and marks…")).toBeHidden();
+
+  const otherTab = await context.newPage();
+  await otherTab.goto("/add/valuation");
+  await otherTab.getByLabel("As-of date").fill("2026-04-12");
+  await otherTab.getByLabel("Investment", { exact: true }).selectOption({ label: "Sample Market Account" });
+  await otherTab.getByLabel("Gross investment value").fill("1000.00");
+  await otherTab.getByLabel("Investment-linked debt").fill("250.00");
+  await otherTab.getByRole("button", { name: "Save valuation mark" }).click();
+  await expect(otherTab.getByText("Valuation saved", { exact: true })).toBeVisible();
+  await otherTab.close();
+
+  await page.getByRole("button", { name: "Save entered marks" }).click();
+  await expect(market).toContainText("Mark exists on 2026-04-12");
+  await expect(market.getByLabel("Gross value")).toHaveValue("1100.00");
+  await expect(market.getByLabel("Linked debt")).toHaveValue("");
+  await expect(market.getByLabel("Linked debt")).toHaveAttribute("placeholder", "Keep 250.00");
+  await expect(market.getByLabel("Save as")).toHaveAttribute("aria-invalid", "true");
+  await expect(market.getByLabel("Gross value")).toHaveAttribute("aria-invalid", "false");
+  await market.getByLabel("Save as").selectOption("replace");
+  await expect(market.locator(".batch-net")).toContainText("$850.00");
+  await page.getByRole("button", { name: "Save entered marks" }).click();
+  await expect(page.getByText("1 valuation mark saved for 2026-04-12.")).toBeVisible();
+  await openHistory(page, "Sample Market Account");
+  const mark = historyItem(page, "Valuation mark", "2026-04-12");
+  await expect(mark).toContainText("$850.00");
+  await expect(mark).toContainText("Debt $250.00");
+});
