@@ -42,6 +42,7 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 | `npm test` | Run the unit tests once |
 | `npm run test:watch` | Watch unit tests during development |
 | `npm run test:e2e` | Run focused desktop and iPhone-class browser workflows against a disposable PostgreSQL database |
+| `npm run test:presentation` | Check shared financial layouts, dates, navigation, focus, and touch targets at desktop/iPhone widths without a database |
 | `npm run check` | Run lint, type checks, tests, and production build in order |
 | `npm run db:up` | Start local PostgreSQL with Docker Compose and wait for readiness |
 | `npm run db:down` | Stop local PostgreSQL, retaining its data volume |
@@ -55,6 +56,8 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 Run `npm run check` and `git diff --check` before handing off changes, plus `npm run test:db` when changing persistence or migrations. Unit tests use Vitest's Node environment and cover the active/closed entry policy and database configuration. Database tests are separate so everyday UI/domain development needs no database.
 
 Browser workflow tests require a local PostgreSQL maintenance connection in `TEST_DATABASE_URL` (for example the disposable Compose service's `postgres` database) and `npx playwright install chromium`. Run `npm run test:e2e`. The runner accepts only a loopback database host, creates and removes its own uniquely named database, migrates it, and seeds synthetic demo records. It starts a local Next.js server with a test-only password and signing secret; no production credentials or private data are needed.
+
+The authenticated shell offers Overview, Investments, Update Center, Add entry, and secondary sign out on desktop and phone. Investments opens canonical record details and preselected history; Update Center reuses the existing batch and correction workflows. Full financial screens and charts remain later EPIC 4 work. See [navigation and shared presentation](docs/design-system.md#navigation-and-shared-presentation-foundation). `npm run test:presentation` renders synthetic component fixtures with production CSS and checks them in Chromium; install Chromium with the same command above.
 
 See [architecture](docs/architecture.md#responsibility-boundaries) for the source layout and dependency direction, and [personal-app scope](docs/architecture.md#personal-app-scope) for implementation tradeoffs.
 

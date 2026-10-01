@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import type { InvestmentOption, StoredMark, StoredMovement } from "@/application/ports";
+import { formatDecimalMoney as money } from "@/components/financial/format";
 
 type History = { movements: StoredMovement[]; marks: Array<StoredMark & { netValue: string }> };
 type Item = { kind: "valuation"; date: string; mark: History["marks"][number] } |
@@ -29,15 +30,9 @@ export function HistoryEmptyStates({ loading, loadFailed, selectedId, itemCount,
       <p className="entry-muted">No investments are available yet.</p>}
   </>;
 }
-function money(value: string) {
-  const negative = value.startsWith("-");
-  const [whole, fraction] = value.replace("-", "").split(".");
-  return `${negative ? "−" : ""}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${fraction ?? "00"}`;
-}
-
-export function HistoryPanel() {
+export function HistoryPanel({ initialInvestmentId = "" }: { initialInvestmentId?: string }) {
   const [investments, setInvestments] = useState<InvestmentOption[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialInvestmentId);
   const [history, setHistory] = useState<History | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
