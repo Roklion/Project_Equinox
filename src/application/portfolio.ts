@@ -1,6 +1,6 @@
 import { assertCalendarDate, formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
 import { WorkflowError } from "./errors";
-import type { CreateInvestment, EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
+import type { CreateInvestment, EditInvestment, EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
 
 function calendarDate(value: string) {
   try { assertCalendarDate(value); } catch { throw new WorkflowError("invalid_date"); }
@@ -11,6 +11,15 @@ function amount(value: string, allowZero = false) {
 }
 const positiveAmount = (value: string) => amount(value);
 const nonnegativeAmount = (value: string) => amount(value, true);
+
+function investmentMetadata<T extends CreateInvestment>(input: T): T {
+  const name = input.name.trim();
+  if (!name || name.length > 200) throw new WorkflowError("invalid_name", "name");
+  const ownerIds = [...new Set(input.ownerIds)];
+  if (ownerIds.length === 0) throw new WorkflowError("owners_required", "ownerIds");
+  return { ...input, name, ownerIds,
+    ...(input.groupIds === undefined ? {} : { groupIds: [...new Set(input.groupIds)] }) };
+}
 
 function validatedMark(input: WriteValuationMark): WriteValuationMark {
   calendarDate(input.asOfDate);
@@ -31,9 +40,16 @@ function validatedReplacement(input: ReplaceValuationMark): ReplaceValuationMark
 export function createPortfolioService(repository: PortfolioRepository) {
   return {
     createInvestment(input: CreateInvestment) {
-      const ownerIds = [...new Set(input.ownerIds)];
-      if (ownerIds.length === 0) throw new Error("An investment needs an owner.");
-      return repository.createInvestment({ ...input, ownerIds });
+      return repository.createInvestment(investmentMetadata(input));
+    },
+    editInvestment(input: EditInvestment) {
+      return repository.editInvestment(investmentMetadata(input));
+    },
+    getInvestmentMetadata(householdId: string, investmentId: string) {
+      return repository.getInvestmentMetadata(householdId, investmentId);
+    },
+    getInvestmentChoices(householdId: string) {
+      return repository.getInvestmentChoices(householdId);
     },
     closeInvestment(householdId: string, investmentId: string, closedOn: string) {
       calendarDate(closedOn);

@@ -5,6 +5,9 @@ import type { PortfolioRepository } from "./ports";
 function fakeRepository() {
   return {
     createInvestment: vi.fn(async () => ({ id: "investment-a" })),
+    editInvestment: vi.fn(async () => ({ id: "investment-a" })),
+    getInvestmentMetadata: vi.fn(),
+    getInvestmentChoices: vi.fn(),
     closeInvestment: vi.fn(async () => ({ id: "investment-a" })),
     recordExternalAction: vi.fn(async () => ({ id: "action-a" })),
     editExternalAction: vi.fn(async () => ({ id: "action-a" })),
@@ -28,6 +31,22 @@ function fakeRepository() {
 }
 
 describe("portfolio application service", () => {
+  it("validates metadata and normalizes associations without financial commands", async () => {
+    const repository = fakeRepository();
+    const service = createPortfolioService(repository);
+    expect(() => service.createInvestment({ householdId: "home", name: "  ", ownerIds: ["a"] })).toThrow("invalid_name");
+    expect(() => service.editInvestment({ householdId: "home", investmentId: "investment-a", name: "Sample", ownerIds: [] })).toThrow("owners_required");
+    expect(() => service.closeInvestment("home", "investment-a", "2026-02-30")).toThrow("invalid_date");
+    expect(repository.createInvestment).not.toHaveBeenCalled();
+    expect(repository.editInvestment).not.toHaveBeenCalled();
+    expect(repository.closeInvestment).not.toHaveBeenCalled();
+    await service.editInvestment({ householdId: "home", investmentId: "investment-a", name: "  Renamed  ",
+      ownerIds: ["a", "b", "a"], groupIds: ["group", "group"], assetClassId: null });
+    expect(repository.editInvestment).toHaveBeenCalledWith({ householdId: "home", investmentId: "investment-a", name: "Renamed",
+      ownerIds: ["a", "b"], groupIds: ["group"], assetClassId: null });
+    expect(repository.recordExternalAction).not.toHaveBeenCalled();
+    expect(repository.recordValuationMark).not.toHaveBeenCalled();
+  });
   it("validates valuation date corrections and preserves negative derived equity", async () => {
     const repository = fakeRepository();
     const service = createPortfolioService(repository);

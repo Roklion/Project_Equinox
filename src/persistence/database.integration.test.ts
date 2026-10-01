@@ -11,7 +11,7 @@ import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
 import { createInvestment, closeInvestment, createPostgresPortfolioRepository, deleteValuationMark, editExternalAction, editTransfer, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
-import { actions, assetClasses, customGroups, investmentGroups, households, institutions, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
+import { accountTypes, actions, assetClasses, customGroups, investmentGroups, households, institutions, investmentOwners, investments, liquidities, movements, owners, taxStatuses, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
 vi.mock("server-only", () => ({}));
@@ -528,5 +528,53 @@ describe("PostgreSQL persistence", () => {
     expect((await service.returns(home.id, endDate, scope)).moic).toEqual({ status: "available", value: 620 / 300 });
     expect((await service.compositionSeries(home.id, startDate, endDate, "investment")).points.at(-1)?.totals)
       .toMatchObject({ status: "available", value: { navCents: 81880n } });
+  });
+
+  it("manages metadata atomically while preserving history and household boundaries", async () => {
+    const { db } = connection!;
+    const [home, other] = await db.insert(households).values([{ name: "Lifecycle example" }, { name: "Other lifecycle example" }]).returning();
+    const [first, second] = await db.insert(owners).values([{ householdId: home.id, name: "Owner A" }, { householdId: home.id, name: "Owner B" }]).returning();
+    const [outsider] = await db.insert(owners).values({ householdId: other.id, name: "Other owner" }).returning();
+    const lookup = async (table: typeof assetClasses | typeof accountTypes | typeof taxStatuses | typeof liquidities | typeof institutions | typeof customGroups) =>
+      (await db.insert(table).values({ householdId: home.id, label: "Synthetic classification" }).returning())[0];
+    const [asset, account, tax, liquidity, institution, group] = await Promise.all([
+      lookup(assetClasses), lookup(accountTypes), lookup(taxStatuses), lookup(liquidities), lookup(institutions), lookup(customGroups),
+    ]);
+    const [foreignClass] = await db.insert(assetClasses).values({ householdId: other.id, label: "Foreign class" }).returning();
+    const [foreignGroup] = await db.insert(customGroups).values({ householdId: other.id, label: "Foreign group" }).returning();
+    const service = createPortfolioService(createPostgresPortfolioRepository(db));
+    const metadata = { householdId: home.id, name: "Synthetic managed investment", ownerIds: [first.id],
+      assetClassId: asset.id, accountTypeId: account.id, taxStatusId: tax.id, liquidityId: liquidity.id, institutionId: institution.id, groupIds: [group.id] };
+    const investment = await service.createInvestment(metadata);
+    const created = await service.getInvestmentMetadata(home.id, investment.id);
+    expect(created).toMatchObject({ name: metadata.name, ownerIds: [first.id], groupIds: [group.id],
+      assetClassId: asset.id, accountTypeId: account.id, taxStatusId: tax.id, liquidityId: liquidity.id, institutionId: institution.id });
+    const choices = await service.getInvestmentChoices(home.id);
+    expect(choices.owners.map((owner) => owner.id)).toEqual(expect.arrayContaining([first.id, second.id]));
+    expect(choices.owners.map((owner) => owner.id)).not.toContain(outsider.id);
+    await service.recordExternalAction({ householdId: home.id, investmentId: investment.id, kind: "contribution", effectiveDate: "2026-02-01", amount: "10" });
+    await service.recordValuationMark({ householdId: home.id, investmentId: investment.id, asOfDate: "2026-02-02", grossValue: "20", debt: "30" });
+    const before = await service.getInvestmentHistory(home.id, investment.id);
+    await service.editInvestment({ ...metadata, investmentId: investment.id, name: "Renamed example", ownerIds: [first.id, second.id], assetClassId: null, groupIds: [] });
+    const edited = await service.getInvestmentMetadata(home.id, investment.id);
+    expect(edited).toMatchObject({ id: investment.id, name: "Renamed example", assetClassId: null, groupIds: [] });
+    expect(edited.ownerIds).toEqual(expect.arrayContaining([first.id, second.id]));
+    expect(await service.getInvestmentHistory(home.id, investment.id)).toEqual(before);
+    for (const invalid of [{ ownerIds: [outsider.id] }, { assetClassId: foreignClass.id }, { groupIds: [foreignGroup.id] }]) {
+      await expect(service.editInvestment({ ...metadata, investmentId: investment.id, ...invalid })).rejects.toMatchObject({ code: "invalid_association" });
+      await expect(service.createInvestment({ ...metadata, ...invalid })).rejects.toMatchObject({ code: "invalid_association" });
+      expect(await service.getInvestmentMetadata(home.id, investment.id)).toEqual(edited);
+    }
+    await expect(service.getInvestmentMetadata(other.id, investment.id)).rejects.toMatchObject({ code: "investment_unavailable" });
+    await expect(service.closeInvestment(home.id, investment.id, "2026-01-31")).rejects.toMatchObject({ code: "close_date_conflict" });
+    await expect(service.closeInvestment(home.id, investment.id, "2026-02-01")).rejects.toMatchObject({ code: "close_date_conflict" });
+    await service.closeInvestment(home.id, investment.id, "2026-02-02");
+    expect(await service.getInvestmentHistory(home.id, investment.id)).toEqual(before);
+    await expect(service.recordExternalAction({ householdId: home.id, investmentId: investment.id, kind: "contribution", effectiveDate: "2026-02-03", amount: "1" })).rejects.toMatchObject({ code: "investment_unavailable" });
+    await expect(service.recordValuationMark({ householdId: home.id, investmentId: investment.id, asOfDate: "2026-02-03", grossValue: "1" })).rejects.toMatchObject({ code: "investment_unavailable" });
+    await service.editInvestment({ ...metadata, investmentId: investment.id, name: "Closed renamed example" });
+    expect(await service.getInvestmentMetadata(home.id, investment.id)).toMatchObject({ status: "closed", closedOn: "2026-02-02" });
+    await expect(service.closeInvestment(home.id, investment.id, "2026-02-04")).rejects.toMatchObject({ code: "investment_unavailable" });
+    expect(await db.select().from(investmentGroups).where(eq(investmentGroups.investmentId, investment.id))).toHaveLength(1);
   });
 });
