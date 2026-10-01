@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
   if (operation === "close" && input.confirmed !== true) errors.confirmed = "Confirm closure to preserve history and stop later activity.";
   if (operation !== "close") {
     for (const field of ["ownerIds", "groupIds"]) {
+      if (field === "groupIds" && input[field] === undefined) continue;
       if (!Array.isArray(input[field]) || input[field].some((id: unknown) => typeof id !== "string" || !id)) errors[field] = "Choose valid records.";
     }
     for (const field of ["assetClassId", "accountTypeId", "taxStatusId", "liquidityId", "institutionId"]) {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await withEntryService(async ({ householdId, service }) => {
       if (operation === "close") return service.closeInvestment(householdId, text("investmentId"), text("closedOn"));
-      const metadata = { householdId, name: text("name"), ownerIds: input.ownerIds as string[], groupIds: input.groupIds as string[],
+      const metadata = { householdId, name: text("name"), ownerIds: input.ownerIds as string[], groupIds: (input.groupIds ?? []) as string[],
         assetClassId: text("assetClassId") || null, accountTypeId: text("accountTypeId") || null,
         taxStatusId: text("taxStatusId") || null, liquidityId: text("liquidityId") || null, institutionId: text("institutionId") || null };
       return operation === "create" ? service.createInvestment(metadata) : service.editInvestment({ ...metadata, investmentId: text("investmentId") });
