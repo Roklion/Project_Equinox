@@ -1,86 +1,17 @@
+import xirr from "xirr";
 import { assertCalendarDate } from "@/domain/financial";
 import type { MetricResult } from "./contracts";
 
 export type DatedReturnFlow = { effectiveDate: string; amountCents: bigint };
 
-// Rates are fractions: -99.99% through 100,000,000%, inclusive.
+// Fixed Excel-style annual guess; bounds validate the returned rate, not the search.
 export const XIRR_POLICY = {
-  minRate: -0.9999, maxRate: 1_000_000,
-  logRateTolerance: 1e-12, residualTolerance: 1e-12, rootMergeTolerance: 1e-9,
+  guess: 0.1, tolerance: 1e-10, maxIterations: 100,
+  minRate: -0.9999, maxRate: 1_000_000, residualTolerance: 1e-8,
 } as const;
 
-type Term = { years: number; coefficient: number };
-
-/** Scale each evaluation by its largest absolute term to avoid exponential overflow.
- * The result is NPV / sum(abs(discounted flows)), with the same zeros and signs.
- */
-function evaluate(terms: readonly Term[], x: number): number {
-  const logs = terms.map((term) => Math.log(Math.abs(term.coefficient)) - term.years * x);
-  const largest = Math.max(...logs);
-  let sum = 0;
-  let magnitude = 0;
-  let compensation = 0;
-  terms.forEach((term, index) => {
-    const absolute = Math.exp(logs[index] - largest);
-    const adjusted = Math.sign(term.coefficient) * absolute - compensation;
-    const next = sum + adjusted;
-    compensation = (next - sum) - adjusted;
-    sum = next;
-    magnitude += absolute;
-  });
-  return sum / magnitude;
-}
-
-function bisect(terms: readonly Term[], left: number, right: number): number {
-  let leftValue = evaluate(terms, left);
-  // The full bounded log-rate interval needs fewer than 50 halvings at this tolerance.
-  for (let iteration = 0; iteration < 64; iteration++) {
-    const middle = (left + right) / 2;
-    const value = evaluate(terms, middle);
-    if (value === 0 || right - left <= XIRR_POLICY.logRateTolerance) return middle;
-    if (Math.sign(value) === Math.sign(leftValue)) {
-      left = middle;
-      leftValue = value;
-    } else right = middle;
-  }
-  return (left + right) / 2;
-}
-
-/** Isolate roots of an exponential polynomial on a bounded log-rate domain.
- * Divide out the earliest exponential (positive, so roots are unchanged).
- * Its derivative has one fewer term. Recursively find derivative roots to split
- * the domain into monotone intervals, then bisect every sign-change bracket.
- * This also detects close roots that a fixed sampling grid could miss.
- */
-function isolateRoots(input: readonly Term[], left: number, right: number): number[] {
-  if (input.length < 2 || input.every((term) => term.coefficient > 0)
-    || input.every((term) => term.coefficient < 0)) return [];
-  const firstYears = input[0].years;
-  const terms = input.map((term) => ({ ...term, years: term.years - firstYears }));
-  const derivative = terms.slice(1).map((term) => ({
-    years: term.years, coefficient: -term.years * term.coefficient,
-  }));
-  const scale = Math.max(...derivative.map((term) => Math.abs(term.coefficient)));
-  const stationary = isolateRoots(derivative.map((term) => ({
-    ...term, coefficient: term.coefficient / scale,
-  })), left, right);
-  const points = [left, ...stationary, right];
-  const values = points.map((x) => evaluate(terms, x));
-  const roots: number[] = [];
-  points.forEach((point, index) => {
-    if (Math.abs(values[index]) <= XIRR_POLICY.residualTolerance) roots.push(point);
-    if (index > 0 && Math.sign(values[index - 1]) !== Math.sign(values[index])
-      && values[index - 1] !== 0 && values[index] !== 0) {
-      roots.push(bisect(terms, points[index - 1], point));
-    }
-  });
-  return roots.sort((a, b) => a - b).filter((root, index, sorted) =>
-    index === 0 || root - sorted[index - 1] > XIRR_POLICY.rootMergeTolerance);
-}
-
-/** Same-day investor flows are netted in bigint cents before normalization.
- * A usable stream needs opposite signs on distinct dates. An identically zero
- * stream has no identifiable annualized return and is unavailable.
+/** Net dates in exact cents, then let the library find one rate from the fixed
+ * guess. Non-convergence or an invalid result is unavailable; roots are not enumerated.
  */
 export function solveXirr(flows: readonly DatedReturnFlow[]): MetricResult<number> {
   const byDate = new Map<string, bigint>();
@@ -92,17 +23,31 @@ export function solveXirr(flows: readonly DatedReturnFlow[]): MetricResult<numbe
   if (!dated.some(([, cents]) => cents < 0n) || !dated.some(([, cents]) => cents > 0n)) {
     return { status: "unavailable", reason: "no_sign_change" };
   }
-  const scale = dated.reduce((largest, [, cents]) => {
-    const absolute = cents < 0n ? -cents : cents;
-    return absolute > largest ? absolute : largest;
-  }, 0n);
-  const firstDay = Date.parse(dated[0][0] + "T00:00:00Z");
-  const terms = dated.map(([date, cents]) => ({
-    years: (Date.parse(date + "T00:00:00Z") - firstDay) / (86_400_000 * 365),
-    coefficient: Number(cents) / Number(scale),
+  const transactions = dated.map(([date, cents]) => ({
+    when: new Date(date + "T00:00:00Z"), amount: Number(cents),
   }));
-  const roots = isolateRoots(terms, Math.log1p(XIRR_POLICY.minRate), Math.log1p(XIRR_POLICY.maxRate));
-  if (roots.length === 0) return { status: "unavailable", reason: "no_root" };
-  if (roots.length > 1) return { status: "unavailable", reason: "multiple_roots" };
-  return { status: "available", value: Math.expm1(roots[0]) };
+  try {
+    const rate = xirr(transactions, XIRR_POLICY);
+    if (!Number.isFinite(rate) || rate < XIRR_POLICY.minRate || rate > XIRR_POLICY.maxRate) {
+      return { status: "unavailable", reason: "no_root" };
+    }
+    // Independently check the dated equation: convergence of Newton steps alone
+    // must not turn a bad candidate into an available financial return.
+    const firstDay = transactions[0].when.getTime();
+    let npv = 0;
+    let magnitude = 0;
+    for (const transaction of transactions) {
+      const years = (transaction.when.getTime() - firstDay) / (86_400_000 * 365);
+      const discounted = transaction.amount / Math.pow(1 + rate, years);
+      npv += discounted;
+      magnitude += Math.abs(discounted);
+    }
+    if (!Number.isFinite(npv) || !Number.isFinite(magnitude)
+      || Math.abs(npv) > XIRR_POLICY.residualTolerance * magnitude) {
+      return { status: "unavailable", reason: "no_root" };
+    }
+    return { status: "available", value: rate };
+  } catch {
+    return { status: "unavailable", reason: "no_root" };
+  }
 }
