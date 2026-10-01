@@ -152,7 +152,7 @@ describe("EPIC 3 canonical cross-metric regressions", () => {
     { name: "zero contributions", contribution: null, withdrawal: null, nav: "10", debt: "0", moic: null, reason: "no_sign_change" },
     { name: "root outside supported domain", contribution: "1", withdrawal: null, nav: "10000000000000", debt: "0", moic: 10000000000000, reason: "no_root" },
     // -100 + 230/(1+r) - 132/(1+r)^2 has roots 10% and 20%.
-    { name: "ambiguous roots", contribution: "100", withdrawal: "230", nav: "0", debt: "132", moic: 0.98, reason: "multiple_roots" },
+    { name: "fixed-guess selection with two roots", contribution: "100", withdrawal: "230", nav: "0", debt: "132", moic: 0.98, reason: null },
   ])("preserves explicit return states: $name", (scenario) => {
     const id = ids.active;
     const sources = { investments: [investment(id)],
@@ -163,6 +163,9 @@ describe("EPIC 3 canonical cross-metric regressions", () => {
       ] };
     const result = calculateReturns(sources, endDate);
     expect(result.moic).toEqual(scenario.moic === null ? { status: "unavailable", reason: "zero_contributions" } : available(scenario.moic));
-    expect(result.xirr).toEqual({ status: "unavailable", reason: scenario.reason });
+    if (scenario.reason === null) {
+      expect(result.xirr.status).toBe("available");
+      if (result.xirr.status === "available") expect(result.xirr.value).toBeCloseTo(0.1, 9);
+    } else expect(result.xirr).toEqual({ status: "unavailable", reason: scenario.reason });
   });
 });
