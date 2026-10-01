@@ -52,7 +52,7 @@ Use these investor-perspective signs:
 
 For a portfolio, combine all qualifying dated cash flows from included investments, cancel transfers only when both legs are inside the portfolio boundary, include a boundary-relative inflow or outflow when only one leg is inside, append aggregate ending NAV, and solve once. Never average or value-weight investment-level IRRs.
 
-XIRR can be undefined or ambiguous when cash flows, including the signed terminal NAV, do not contain a sign change or yield multiple roots. Use a deterministic bounded root search and robust bracketed solver in TypeScript/Node, rather than Newton-Raphson alone. No-root and multiple-root cases return explicit unavailable reasons. Search bounds, numerical tolerances, and display rounding must be finalized in the XIRR implementation ticket (#39); do not arbitrarily select a root from an ambiguous result.
+XIRR can be undefined or ambiguous when cash flows, including the signed terminal NAV, do not contain a sign change or yield multiple roots. Use a deterministic bounded root search and robust bracketed solver in TypeScript/Node, rather than Newton-Raphson alone. No-root and multiple-root cases return explicit unavailable reasons. The implemented bounds and numerical tolerances are specified below. Display rounding belongs to presentation; do not arbitrarily select a root from an ambiguous result.
 
 ## Time-weighted return
 
@@ -127,7 +127,7 @@ The shared MetricResult<T> contract is defined in src/domain/analytics/contracts
 | unavailable | reason: no_root | No supported root found by the bounded solver |
 | unavailable | reason: multiple_roots | XIRR is ambiguous |
 
-These are contracts for later metric implementations, not implementations of MOIC/XIRR in the snapshot ticket. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
+Snapshot, cash-flow, and return queries share these result states. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
 
 The authoritative calculateSnapshot path returns requested asOfDate, constituent investment metadata and valuation results, complete/incomplete totals, and coverage (selectedCount, valuedCount, missingInvestmentIds). Available constituents include markId, markAsOfDate, ageDays, grossValueCents, debtCents, and navCents. Staleness is derived at query time and never persisted.
 
@@ -139,4 +139,20 @@ The application `period` query returns beginning/ending snapshots, dated flows, 
 
 The `inception` query includes all recorded actions with effectiveDate <= asOfDate. It returns cumulative contributions/distributions, net invested capital, the as-of snapshot, and a separate P&L result. Inception P&L assumes a zero opening NAV and complete recorded capital history; it cannot reconstruct capital omitted from canonical records. Missing ending marks leave cumulative capital totals available but P&L incomplete. Closed investments are retained; closure alone never substitutes a terminal zero mark. Partial realization, distributions exceeding contributions, and negative NAV remain ordinary exact-cent results.
 
-These dated flows are reusable inputs for subsequent MOIC/XIRR work. Neither this layer nor persistence formats money, calculates percentage returns, or stores mutable aggregate results.
+The returns query reuses these dated flows for MOIC/XIRR. Cash-flow calculations and persistence do not format money or store mutable aggregate results.
+
+## Inception return query and numerical policy
+
+The application `returns(householdId, asOfDate, scope)` query reads fresh canonical sources and delegates to `calculateReturns` in `src/domain/analytics/returns.ts`. It reuses `calculateInception` for scope selection, complete logical-action classification, cumulative totals, and the terminal snapshot. The output retains those exact-cent inputs and valuation dates alongside separate `moic` and `xirr` results. Missing terminal valuation coverage makes both returns incomplete, even when capital totals are available. Zero contributions with complete coverage makes MOIC unavailable. Empty scopes have unavailable returns.
+
+MOIC adds signed aggregate NAV and cumulative distributions in bigint cents, then divides by aggregate contributions as a floating-point ratio. Negative multiples are valid. XIRR signs the boundary-relative dated flows from the investor perspective and appends signed aggregate NAV on the requested measurement date, including when the selected terminal marks are older. Same-date cash flows and terminal NAV are netted exactly in bigint cents; zero date totals are removed before solver normalization. Both signs on distinct dates are required. A zero stream or a stream confined to one date has no identifiable annualized return (`no_sign_change`).
+
+`solveXirr` in `src/domain/analytics/xirr.ts` normalizes the exact dated totals by their largest absolute amount and solves in log-rate space `x = log(1 + r)`, using actual UTC calendar-day differences divided by 365. The supported rate domain is inclusive `-0.9999 <= r <= 1,000,000` (rates are fractions, from -99.99% to 100,000,000%). Rates at or below -100% are unsupported. A stream whose only roots lie outside this domain yields `no_root`.
+
+The bounded search isolates stationary points recursively: factor out the earliest positive exponential, differentiate the remaining exponential polynomial (removing one term), and find its derivative roots. These points partition the domain into monotone intervals. Every sign-change interval is solved by bisection, rather than relying on an initial guess or fixed grid. This detects closely spaced crossing roots and also checks stationary points for repeated roots. Same-sign coefficient sequences terminate the recursion immediately.
+
+Bisection stops at a log-rate bracket width of `1e-12` (at most 64 iterations). Evaluations scale by the largest absolute discounted term, use compensated summation, and divide by the sum of absolute discounted terms to avoid overflow. Endpoints and stationary points with relative NPV residual at most `1e-12` count as numerical root candidates. Candidates within `1e-9` in log-rate space are treated as one numerically indistinguishable root. This is finite-precision identification, not symbolic proof: nearly tangent roots closer than the tolerances cannot be distinguished. No candidate yields `no_root`; multiple distinct candidates yield `multiple_roots`; one yields an unrounded finite annualized rate. All outcomes are deterministic.
+
+Returns are inception-to-date from complete recorded capital history, with no persisted or cached source-of-truth fields. Corrections or deletions of actions and marks change the next calculation naturally. The same query supports the existing owner, classification, investment and custom-group filters and retains closed investments. It never averages child rates or multiples.
+
+Regression tests include hand-checkable annual and leap-year cases, multiple contributions, partial/closed realization, transfer boundaries, missing marks, negative NAV, close and repeated roots, bounded no-root cases, and [Microsoft's published irregular-date XIRR example](https://support.microsoft.com/en-us/excel/functions/xirr-function). No UI percentage rounding or TWR calculation is introduced.
