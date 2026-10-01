@@ -20,6 +20,20 @@ beforeEach(() => {
   service.closeInvestment.mockResolvedValue({ id: "investment-a" });
 });
 describe("investment management API", () => {
+  it("accepts omitted optional groups on create/edit while rejecting malformed groups", async () => {
+    for (const operation of ["create", "edit"]) {
+      const response = await POST(post({ operation, investmentId: "investment-a", name: "Sample", ownerIds: ["owner-a"] }));
+      expect(response.status).toBe(200);
+      expect(operation === "create" ? service.createInvestment : service.editInvestment)
+        .toHaveBeenCalledWith(expect.objectContaining({ ownerIds: ["owner-a"], groupIds: [] }));
+    }
+    for (const groupIds of [null, "group-a", [null]]) {
+      expect((await POST(post({ ...metadata, operation: "create", groupIds }))).status).toBe(400);
+    }
+    expect((await POST(post({ operation: "create", name: "Sample" }))).status).toBe(400);
+    expect(service.createInvestment).toHaveBeenCalledTimes(1);
+    expect(service.editInvestment).toHaveBeenCalledTimes(1);
+  });
   it("resolves household server-side and exposes stable choice identities without caching", async () => {
     service.getInvestmentChoices.mockResolvedValue({ owners: [{ id: "owner-a", label: "Owner A" }] });
     service.getInvestmentMetadata.mockResolvedValue({ id: "investment-a", ownerIds: ["owner-a"] });
