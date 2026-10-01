@@ -80,10 +80,12 @@ export function CompositionChart({ seriesByGrouping }: {
   const series = seriesByGrouping[group] ?? seriesByGrouping[supported[0]?.value];
   const points = useMemo(() => series ? visiblePoints(series.points, series.endDate, range) : [], [series, range]);
   const mapped = useMemo(() => compositionData(points, series?.points), [points, series]);
-  const lines = useMemo(() => mapped.segments.map((segment) => ({
+  const lines = useMemo(() => mapped.segments.map((segment, index) => ({
     name: segment.label, type: "line", step: "end", smooth: false, connectNulls: false,
     stack: mapped.negative ? undefined : "nav", symbolSize: 5, showSymbol: true,
     lineStyle: { width: mapped.negative ? 2 : 1 },
+    endLabel: { show: true, formatter: () => String(index + 1), distance: 4, color: "inherit" },
+    labelLayout: { moveOverlap: "shiftY" },
     areaStyle: mapped.negative ? undefined : { opacity: 0.55 }, data: segment.data,
   })), [mapped]);
   if (!series) return <p>No composition series supplied.</p>;
@@ -100,7 +102,7 @@ export function CompositionChart({ seriesByGrouping }: {
         <dl className="chart-segments">{mapped.segments.map((segment, index) => {
           const bucket = selected.breakdown.find((item) => item.key === segment.key);
           return <div key={segment.key}><dt><span className="chart-swatch" aria-hidden="true"
-            style={{ backgroundColor: "var(--chart-series-" + (index % 8 + 1) + ")" }} />{segment.label}</dt>
+            style={{ backgroundColor: "var(--chart-series-" + (index % 8 + 1) + ")" }} />{index + 1}. {segment.label}</dt>
             <dd>{bucket ? <MetricValue result={bucket.totals.status === "available"
               ? { status: "available", value: bucket.totals.value.navCents } : bucket.totals} format={formatMoney} />
               : "Not in scope on this date"}</dd></div>;

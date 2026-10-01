@@ -83,3 +83,18 @@ test("phone horizontal touch selects dates and vertical gesture scrolls", async 
   await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before + 20);
 });
+
+test("repeated composition colors retain distinct numbered plot and breakdown labels", async ({ page }) => {
+  const chart = page.getByTestId("many");
+  await chart.scrollIntoViewIfNeeded();
+  const entries = chart.locator(".chart-segments dt");
+  await expect(entries).toHaveCount(9);
+  // First and ninth share a palette color, so color alone cannot identify them.
+  const swatches = chart.locator(".chart-swatch");
+  expect(await swatches.nth(0).evaluate((node) => getComputedStyle(node).backgroundColor))
+    .toBe(await swatches.nth(8).evaluate((node) => getComputedStyle(node).backgroundColor));
+  for (let index = 0; index < 9; index++) {
+    await expect(entries.nth(index)).toHaveText((index + 1) + ". Example bucket " + (index + 1));
+    await expect(chart.locator('svg text[text-anchor="start"]').filter({ hasText: new RegExp("^" + (index + 1) + "$") })).toBeVisible();
+  }
+});

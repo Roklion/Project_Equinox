@@ -3,10 +3,11 @@ import { useEffect, useRef, type PointerEvent } from "react";
 import { init, use as register, type EChartsCoreOption } from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent } from "echarts/components";
+import { LabelLayout } from "echarts/features";
 import { SVGRenderer } from "echarts/renderers";
 import type { Snapshot } from "@/domain/analytics/snapshot";
 import { nearestPoint, selectedFraction, timestamp } from "./model";
-register([LineChart, GridComponent, SVGRenderer]);
+register([LineChart, GridComponent, SVGRenderer, LabelLayout]);
 
 export function HistoryPlot({ points, selected, onSelect, series }: {
   points: readonly Snapshot[]; selected: number; onSelect: (index: number) => void;
