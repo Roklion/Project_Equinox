@@ -23,6 +23,9 @@ function Inspector({ points, endDate, title, summary, series, controls, onPoint 
 }) {
   const [date, setDate] = useState<string | null>(null);
   const id = useId();
+  if (date !== null && !points.some((point) => point.asOfDate === date)) {
+    setDate(points.at(-1)?.asOfDate ?? null);
+  }
   const index = Math.max(0, date && points.some((point) => point.asOfDate === date)
     ? points.findIndex((point) => point.asOfDate === date) : points.length - 1);
   const point = points[index];

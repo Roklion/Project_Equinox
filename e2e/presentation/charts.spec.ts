@@ -98,3 +98,20 @@ test("repeated composition colors retain distinct numbered plot and breakdown la
     await expect(chart.locator('svg text[text-anchor="start"]').filter({ hasText: new RegExp("^" + (index + 1) + "$") })).toBeVisible();
   }
 });
+
+test("a range fallback persists when the previously selected observation returns", async ({ page }) => {
+  for (const name of ["Value over time", "Composition over time"]) {
+    const chart = page.getByTestId("complete").getByRole("region", { name });
+    const dates = chart.getByLabel("Inspect recorded date");
+    await dates.selectOption("2026-01-01");
+    await chart.getByRole("button", { name: "3M", exact: true }).click();
+    await expect(dates).toHaveValue("2026-10-01");
+    await chart.getByRole("button", { name: "All", exact: true }).click();
+    await expect(dates).toHaveValue("2026-10-01");
+    await expect(chart.locator(".as-of-date time")).toHaveAttribute("datetime", "2026-10-01");
+    // A selection still inside the new range should remain selected.
+    await dates.selectOption("2026-07-01");
+    await chart.getByRole("button", { name: "1Y", exact: true }).click();
+    await expect(dates).toHaveValue("2026-07-01");
+  }
+});
