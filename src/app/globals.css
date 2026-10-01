@@ -122,6 +122,52 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
 .empty-state .availability { margin-top: var(--space-3); font-size: 0.875rem; }
 .site-footer { padding-block: var(--space-3); border-top: 1px solid var(--color-border); }
 
+/* One navigation model; composition changes without duplicating controls. */
+.shell-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.primary-navigation { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.primary-navigation a { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0.65rem 1rem; border-radius: var(--radius-small); text-decoration: none; font-weight: 700; }
+.primary-navigation a[aria-current="page"] { background: var(--color-accent-soft); text-decoration: underline; text-underline-offset: 0.3em; }
+.primary-navigation .navigation-add { background: var(--color-accent); color: var(--color-surface); }
+.primary-navigation .navigation-add[aria-current="page"] { background: var(--color-accent); }
+.shell-signout .text-button { min-height: 48px; font-size: 0.875rem; font-weight: 400; color: var(--color-muted); }
+.metric-number { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.headline-value { padding-block: var(--space-3); }
+.headline-value p { margin-block: var(--space-1); }
+.headline-number > .metric-number, .headline-number .metric-unavailable > .metric-number { display: block; font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1.15; letter-spacing: -0.04em; }
+.as-of-date, .metric-context, .valuation-age { color: var(--color-muted); font-size: 0.875rem; margin-block: 0.4rem; }
+.signed-delta { font-size: 1rem; }
+.metric-unavailable { display: flex; flex-direction: column; gap: 0.25rem; color: var(--color-muted); font-size: 0.875rem; }
+.financial-breakdown, .metadata-rows { margin: 0; }
+.financial-breakdown > div, .metadata-rows > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); padding-block: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.financial-breakdown dd, .metadata-rows dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.return-metric { padding-block: var(--space-3); }
+.return-metric h3 { font-size: 1rem; font-weight: 400; margin-top: 0; }
+.return-metric > .metric-number { font-size: 2rem; }
+.classification-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); padding: 0; margin-block: var(--space-1); list-style: none; }
+.classification-chips li { padding: 0.25rem 0.75rem; border-radius: 2rem; background: var(--color-accent-soft); font-size: 0.8rem; overflow-wrap: anywhere; }
+.investment-list { display: grid; }
+.investment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: var(--space-3); padding-block: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.investment-row h2 { font-family: var(--font-body); font-size: 1.15rem; font-weight: 700; letter-spacing: normal; margin: 0; overflow-wrap: anywhere; }
+.investment-row h2 a { display: inline-flex; align-items: center; min-height: 48px; }
+.investment-row-value { text-align: right; }
+.investment-row-value > .metric-number { font-size: 1.5rem; }
+.surface-state, .chart-frame { margin-block: var(--space-3); padding: clamp(var(--space-3), 5vw, var(--space-5)); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.surface-state p { max-width: 38rem; color: var(--color-muted); }
+.surface-state a { display: inline-flex; align-items: center; min-height: 48px; }
+.chart-frame h2 { margin-top: 0; }
+.selected-date-summary { padding-bottom: var(--space-2); }
+.chart-content { min-width: 0; }
+.metadata-section { margin-block: var(--space-4); }
+@media (max-width: 40rem) {
+  .shell-controls { align-items: stretch; flex-direction: column; }
+  .primary-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shell-signout { align-self: flex-end; }
+  .investment-row { grid-template-columns: 1fr; gap: var(--space-1); }
+  .investment-row-value { text-align: left; }
+  .financial-breakdown > div, .metadata-rows > div { grid-template-columns: 1fr; gap: 0.25rem; }
+  .financial-breakdown dd, .metadata-rows dd { text-align: left; }
+}
+
 @media (max-width: 40rem) {
   .site-header { align-items: flex-start; flex-direction: column; gap: var(--space-1); padding-block: var(--space-3); }
   main { padding-block: var(--space-5); }

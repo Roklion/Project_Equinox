@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import type { InvestmentOption, StoredMark } from "@/application/ports";
 import { formatCents, netValue, parseSignedCents } from "@/domain/financial";
+import { formatDecimalMoney as money } from "@/components/financial/format";
 
 type Mark = StoredMark & { netValue: string };
 type InvestmentRow = InvestmentOption & { existing: Mark | null; previous: Mark | null; latest: Mark | null };
@@ -80,12 +81,6 @@ function today() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
-function money(value: string) {
-  const negative = value.startsWith("-");
-  const [whole, fraction] = value.replace("-", "").split(".");
-  return `${negative ? "−" : ""}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${fraction ?? "00"}`;
-}
-
 export function BatchForm() {
   const browserDate = useSyncExternalStore(subscribe, today, () => "");
   const [date, setDate] = useState<string | null>(null);

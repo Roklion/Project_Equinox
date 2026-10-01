@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { InvestmentOption, StoredMark } from "@/application/ports";
-import { formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
+import { formatCents, netValue, parseSignedCents } from "@/domain/financial";
+import { formatDecimalMoney as money } from "@/components/financial/format";
 
 type Kind = "contribution" | "withdrawal" | "transfer" | "valuation";
 type MarkWithNet = StoredMark & { netValue: string };
@@ -25,15 +26,6 @@ function emptySubscribe() {
 
 function serverCalendarDate() {
   return "";
-}
-
-function money(value: string) {
-  const negative = value.startsWith("-");
-  const cents = parseCents(negative ? value.slice(1) : value, true);
-  const normalized = formatCents(cents);
-  const [whole, fraction] = normalized.replace("-", "").split(".");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${negative ? "−" : ""}$${grouped}.${fraction}`;
 }
 
 function inputError(errors: FieldErrors, field: string) {

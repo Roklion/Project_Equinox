@@ -51,7 +51,17 @@ Use semantic design tokens for color, typography, spacing, radii, elevation, and
 
 Color must not carry meaning alone. Positive and negative states need labels, signs, shapes, or patterns as appropriate. Text, controls, focus indicators, and charts should meet WCAG 2.2 AA contrast and interaction expectations.
 
-The initial shell uses a light neutral canvas, white surfaces, dark green text and accents, system sans-serif body text, and a system serif display face. Semantic CSS custom properties in `src/app/globals.css` own its colors, fonts, spacing, radii, and elevation; no external font request is required. This is a starting visual direction, not a complete brand system. The shell stacks its header below 40rem, includes a keyboard skip link and visible link focus, and displays an explicit overview placeholder without invented financial values.
+The shell uses a light neutral canvas, white surfaces, dark green text and accents, system sans-serif body text, and a system serif display face. Semantic CSS custom properties in `src/app/globals.css` own its colors, fonts, spacing, radii, and elevation; no external font request is required. The shell stacks its header below 40rem and includes a keyboard skip link and visible focus.
+
+## Navigation and shared presentation foundation
+
+One primary navigation exposes **Overview** (`/`), **Investments** (`/investments`), **Update Center** (`/updates`), and the existing **Add entry** launcher (`/add`). Desktop presents these horizontally; below 40rem they form a two-column touch-friendly grid. The same links remain available without hover or a sidebar. The current destination is underlined and uses `aria-current`; investment detail and history belong to Investments, batch valuation belongs to Update Center, and entry forms belong to Add. Sign out is a quiet secondary control available throughout the authenticated shell. Sign-in shows neither product navigation nor sign out. Shell edge padding retains installed-PWA safe areas; all navigation and sign-out targets are at least 48px tall.
+
+The Investments foundation lists canonical active and closed records and links to `/investments/[investmentId]`, which shows classification metadata and opens the existing history workflow with that investment selected. Update Center links to existing batch valuation and history/correction workflows. These are route foundations: complete financial summaries, lifecycle management, update guidance, and charts belong to the following EPIC 4 tickets. Placeholders state that boundary explicitly and never invent live financial values. Investment creation remains separate from the financial Add launcher.
+
+`src/components/financial` owns headline values, signed deltas, as-of dates, gross/debt/NAV and cash-flow/performance/P&L breakdowns, MOIC/XIRR, unavailable explanations, valuation age, classification chips, metadata rows, investment rows, surface states, and chart frames. These compose authoritative `MetricResult`, snapshot, and period-change outputs; no financial formulas are calculated in these components. The same exact-money formatter serves existing entry, batch, and history workflows.
+
+Money uses exact bigint cents, USD labels, tabular numerals and retained negative signs. Dates are formatted as calendar dates without local timezone shifts and remain visible at narrow widths. Available zero metrics remain zero; incomplete coverage and unavailable returns use an em dash plus a reason. An optional presentation-only ambiguous state also requires a reason; the current fixed-guess XIRR domain solver does not emit ambiguity. Gross/debt/NAV and performance breakdowns display supplied results without recomputation. Any carried-forward valuation is labeled **Older valuation**, with its supplied age in days and original mark date, rather than inventing a universal freshness cutoff. Current marks are labeled **Current valuation**. Selected-date/value context sits outside the chart in a polite live region. Loading and error surfaces use status/alert semantics; investment rows and metadata stack at phone widths.
 
 Financial values use tabular numerals where available, an explicit currency, consistent precision within a view, and a real unavailable state such as an em dash. Negative values retain their sign. Every current-value context includes an as-of date.
 
@@ -121,12 +131,10 @@ Likely reusable components include value summaries, metric cards, as-of labels, 
 ## Open design decisions
 
 - visual identity, palette, typography, and icon system;
-- navigation model and information architecture;
-- exact desktop breakpoints and mobile navigation behavior;
 - chart behavior for sparse or irregular valuation marks;
 - density and interaction model for large investment lists; and
 - install and update prompts for the PWA; offline financial-data behavior requires a separate security and product decision.
 
 ## Authentication screen
 
-The password-only sign-in screen uses the shell's existing color, type, spacing, focus, and surface tokens. It provides one labeled password field, one primary action, and a generic failure message. The overview exposes a sign-out action after authentication. The flow has no username, account creation, or password recovery controls in the personal MVP.
+The password-only sign-in screen uses the shell's existing color, type, spacing, focus, and surface tokens. It provides one labeled password field, one primary action, and a generic failure message. The authenticated shell exposes sign out. The flow has no username, account creation, or password recovery controls in the personal MVP.
