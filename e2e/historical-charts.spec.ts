@@ -2,15 +2,23 @@ import { expect, test } from "@playwright/test";
 import { historyItem, openHistory, signIn } from "./helpers";
 test("authenticated charts use persisted household and investment series", async ({ page }) => {
   await signIn(page);
+  // Other supported workflows create investments in this shared disposable household.
+  const { investments } = await (await page.request.get("/api/investments")).json();
+  const seedOnly = investments.length === 5;
   const trend = page.getByRole("region", { name: "Value over time" });
   const composition = page.getByRole("region", { name: "Composition over time" });
   await expect(trend.locator("svg")).toBeVisible();
   await trend.getByLabel("Inspect recorded date").selectOption("2025-06-30");
   await composition.getByLabel("Inspect recorded date").selectOption("2025-06-30");
-  await expect(trend.locator(".headline-number")).toHaveText("$20,250.00");
-  await expect(composition.locator(".headline-number")).toHaveText("$20,250.00");
+  await expect(trend.locator(".headline-number")).toHaveText(seedOnly ? "$20,250.00" : /Valuation coverage is incomplete/);
+  await expect(composition.locator(".headline-number")).toHaveText(seedOnly ? "$20,250.00" : /Valuation coverage is incomplete/);
+  await expect(trend).toContainText(`5 of ${investments.length} investments valued`);
+  for (const [name, value] of [["Sample Market Account", "$9,400.00"], ["Sample Retirement Account", "$9,150.00"],
+    ["Sample Property Investment", "−$1,000.00"], ["Sample Insurance Policy", "$2,700.00"], ["Sample Digital Asset Wallet", "$0.00"]]) {
+    await expect(composition.locator(".chart-segments > div").filter({ hasText: name }).locator("dd")).toHaveText(value);
+  }
   await trend.getByLabel("Inspect recorded date").selectOption("2025-03-31");
-  await expect(trend.locator(".headline-number")).toHaveText("$18,700.00");
+  await expect(trend.locator(".headline-number")).toHaveText(seedOnly ? "$18,700.00" : /Valuation coverage is incomplete/);
   await composition.getByLabel("Group by").selectOption("ownerSet");
   await expect(composition.locator(".chart-segments")).toContainText(/Owner A \+ Owner B|Owner B \+ Owner A/);
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Investments", exact: true }).click();

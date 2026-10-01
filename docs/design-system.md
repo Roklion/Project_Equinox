@@ -69,6 +69,14 @@ For financial output surfaces, use Monarch Money as a consumer-finance hierarchy
 
 Reusable value, delta, date, investment-row, and history components should compose with both the total-value trend and the stacked composition-over-time chart. The trend explains how much value changed; composition explains what makes up that value. Keep their visual roles distinct.
 
+## Investments browse and detail
+
+Investments defaults to active records, with explicit closed-only and combined views. Rows show authoritative NAV, reporting date, effective mark date/age, lifecycle and selected asset-class/institution context. Missing marks remain unavailable. Filters use stable asset-class, institution, owner and custom-group IDs; overlapping groups filter rather than create additive segments. Ordering is display name then stable identity. The editable reporting date uses the browser-local chart date once shared, with today's UTC calendar date as the initial fallback; the date is always shown explicitly.
+
+Investment detail leads with NAV, selected-period change, reporting date and mark age, followed by financial Add and Manage entry points. Closed records show the close date and historical correction access without ordinary Add. The default performance period is year to date, with editable start/end dates; since-inception P&L and returns are labeled separately. Both use authoritative investment-boundary analytics, including crossing transfer flows. Detail composes the shared chart frame, value/debt breakdown, cash-flow/performance and returns components. Detail renders interactive value and composition charts alongside the actual dated valuation history link. An explicitly selected reporting date controls both financial summaries and chart cutoff; without an explicit date, detail uses the browser-local chart date once available, with the existing UTC fallback until it is shared.
+
+Desktop uses a wider financial column beside ownership/classification disclosure. iPhone stacks these sections and filters, preserving dates and value signs. Metadata filters and ownership detail use native progressive disclosure, keeping the ordinary browse experience focused on values. Browse/detail navigation retains the selected reporting date. Action/valuation history links pass the investment identity into the existing EPIC 2 history/correction surface; detail introduces no parallel mutation UI.
+
 ## Charts
 
 Apache ECharts is the charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
@@ -108,7 +116,7 @@ On desktop, charts support hover and precise pointer inspection. On iPhone, they
 
 The shared ValueTrendChart and CompositionChart consume the authoritative historical-series outputs. NAV is the default trend; gross value and investment-linked debt are optional measure controls. Grouping choices are restricted to supplied additive series: investment, asset class, account type, tax status, liquidity, institution, and owner set. Labels and stable bucket keys come from analytics.
 
-Overview and investment-detail chart queries end on the browser's local calendar date, matching valuation entry. A date-only session cookie conveys this reporting date to fresh server reads; first visits show a loading state until it is available. Revisiting charts updates a changed local date without storing financial values.
+Overview and investment-detail chart queries default to the browser's local calendar date, matching valuation entry. An explicit detail reporting date instead controls the cutoff and does not synchronize back to local today. A date-only session cookie conveys this reporting date to fresh server reads; first visits show a loading state until it is available. Revisiting charts updates a changed local date without storing financial values.
 
 Both charts use an elapsed-calendar-time axis and unsmoothed steps between recorded snapshots. Dots identify actual observations; intermediate positions never create a selectable financial point. A single observation is a dot, and an empty range has an explicit message. All, one-year, and three-month ranges filter existing observations relative to the supplied range end, without generating endpoint observations.
 
@@ -125,6 +133,10 @@ The neutral chart frame, as-of labels, exact-money formatting, controls and cate
 Desktop can use side-by-side summaries, charts, filters, and tables when width supports them. Mobile should prioritize the headline value and primary action, stack supporting content, use compact drill-down surfaces, and keep important controls within comfortable touch reach. Responsive design may change composition and interaction while preserving the same underlying meaning. The installed iPhone shell respects display safe areas, including the bottom home indicator.
 
 ## Input workflows
+
+Investment management is separate from the four financial Add actions. Investments links to **Add investment** at `/investments/new`; investment detail links to **Manage investment** at `/investments/[investmentId]/manage`. Creation and editing use a single-column form on phones, paired classification selectors where desktop width allows, and touch-friendly owner/custom-group checkboxes. Select existing stable lookup records, allow classifications to be cleared, and require at least one owner. Creation does not require an opening valuation or contribution. Ordinary validation failures retain entered values, and pending writes disable submission and metadata controls.
+
+Closing is a separate section of management, with an explicitly entered calendar date and a confirmation explaining that historical actions and valuation marks remain available, activity after the close date stops, and reopening is unsupported. A close date before recorded activity produces a field-level conflict without changing the investment. Closed investments remain visible and their metadata remains editable; management does not expose reopening or deletion. These entry points can compose with shared navigation and presentation primitives as those are implemented.
 
 Entry surfaces should default dates and recent selections when safe, accept keyboard and touch input efficiently, validate close to the field, and keep financial signs understandable through language such as contribution and distribution.
 

@@ -14,7 +14,7 @@ import { SurfaceState } from "@/components/financial/primitives";
 export async function loadHistoricalCharts(scope: SnapshotScope = {}, suppliedDate?: string) {
   let endDate = suppliedDate ?? (await cookies()).get("equinox-chart-date")?.value;
   try { if (endDate) assertCalendarDate(endDate); } catch { endDate = undefined; }
-  const reportingDate = <ChartReportingDate serverDate={endDate} />;
+  const reportingDate = suppliedDate ? null : <ChartReportingDate serverDate={endDate} />;
   if (!endDate) return <>{reportingDate}<SurfaceState kind="loading" title="Loading charts">Preparing your local reporting date.</SurfaceState></>;
   try {
     const data = await withEntryService(({ householdId }) =>

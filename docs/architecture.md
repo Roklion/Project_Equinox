@@ -20,6 +20,8 @@ This scope still calls for meaningful financial-data integrity and privacy: exac
 
 ## Responsibility boundaries
 
+Investment management extends the existing portfolio service and repository port with full metadata replacement, current metadata, and household-scoped owner/classification choices. Creation writes the investment and owner/custom-group links atomically; editing updates metadata and replaces associations in one transaction without touching financial rows. Lifecycle and association conflicts use stable `WorkflowError` codes (with a field key when applicable), and the investment API translates them into field-level feedback without exposing database errors. Routes reuse the server-side single-household composition root; client-supplied household IDs cannot select a household. See [management interaction rules](design-system.md#input-workflows).
+
 The eventual implementation should keep these responsibilities distinct:
 
 - **Presentation:** responsive pages, accessible components, forms, and chart interactions.
@@ -126,6 +128,8 @@ Multi-currency support and foreign exchange are outside the USD-only MVP.
 The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while login and logout endpoints remain reachable to handle authentication state. Auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable, and server logs use fixed messages without driver details or secret values. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie on success; if revocation fails, it returns 503 and preserves the token so the browser can retry. Other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.
 
 ## Analytics read boundary
+
+The single-household server composition root provides both portfolio workflows and read-only analytics. Investments browse consumes the snapshot query; detail consumes investment-scoped returns (including its authoritative snapshot/inception context) and period queries. Presentation selects rows by canonical metadata IDs and formats supplied results, without recalculating money or returns. Financial pages are dynamic and do not introduce offline caching. Reporting/filter state lives in the URL.
 
 EPIC 3 analytics use the application-owned AnalyticsRepository in src/application/analytics-ports.ts, separate from PortfolioRepository mutation and entry workflows established in #25. The initial getSnapshotSources(householdId, throughDate) port supplies household-scoped investments (including closed lifecycle state), stable classification IDs/labels, owner associations, custom-group memberships, and canonical valuation marks through the requested date. The getCashFlowSources(householdId, throughDate) port adds canonical actions and their complete linked movements to those snapshot sources. Both transfer legs are read before reporting-scope selection, through the same read-only repeatable-read transaction as the investments and marks. Snapshot-only reads do not query actions.
 

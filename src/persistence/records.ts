@@ -1,11 +1,11 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or } from "drizzle-orm";
 import { assertCalendarDate, formatCents, parseCents, type Provenance } from "@/domain/financial";
 import { WorkflowError } from "@/application/errors";
-import type { EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement } from "@/application/ports";
+import type { CreateInvestment, EditInvestment, InvestmentMetadata, EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, ReplaceValuationMark, SaveValuationBatch, StoredMovement } from "@/application/ports";
 import type { createDatabase } from "./database";
 import {
-  accountTypes, actions, assetClasses, institutions, investmentOwners, investments, liquidities, movements, taxStatuses, valuationMarks,
+  accountTypes, actions, assetClasses, customGroups, institutions, investmentGroups, investmentOwners, investments, liquidities, movements, owners, taxStatuses, valuationMarks,
 } from "./schema";
 
 type PoolDatabase = ReturnType<typeof createDatabase>["db"];
@@ -28,14 +28,11 @@ async function requireValidActivityDate(
 }
 
 /** Create an investment and all owner links together, with no ownerless committed row. */
-export async function createInvestment(db: Database, input: {
-  householdId: string; name: string; ownerIds: string[];
-  assetClassId?: string; accountTypeId?: string; taxStatusId?: string;
-  liquidityId?: string; institutionId?: string;
-}) {
+export async function createInvestment(db: Database, input: CreateInvestment) {
   const ownerIds = [...new Set(input.ownerIds)];
   if (ownerIds.length === 0) throw new Error("An investment needs an owner.");
   return db.transaction(async (tx) => {
+    await validateInvestmentAssociations(tx, input);
     const [investment] = await tx.insert(investments).values({
       householdId: input.householdId, name: input.name,
       assetClassId: input.assetClassId, accountTypeId: input.accountTypeId,
@@ -44,17 +41,97 @@ export async function createInvestment(db: Database, input: {
     await tx.insert(investmentOwners).values(ownerIds.map((ownerId) => ({
       householdId: input.householdId, investmentId: investment.id, ownerId,
     })));
+    const groupIds = [...new Set(input.groupIds ?? [])];
+    if (groupIds.length) await tx.insert(investmentGroups).values(groupIds.map((groupId) => ({
+      householdId: input.householdId, investmentId: investment.id, groupId,
+    })));
     return investment;
   });
 }
 
 export async function closeInvestment(db: Database, householdId: string, investmentId: string, closedOn: string) {
   assertCalendarDate(closedOn);
-  const [closed] = await db.update(investments).set({ status: "closed", closedOn })
-    .where(and(eq(investments.householdId, householdId), eq(investments.id, investmentId), eq(investments.status, "active")))
-    .returning();
-  if (!closed) throw new Error("Active investment not found.");
-  return closed;
+  return db.transaction(async (tx) => {
+    const investment = await getInvestmentMetadata(tx, householdId, investmentId);
+    if (investment.status !== "active") throw new WorkflowError("investment_unavailable");
+    const laterMarks = await tx.select({ id: valuationMarks.id }).from(valuationMarks).where(and(
+      eq(valuationMarks.householdId, householdId), eq(valuationMarks.investmentId, investmentId), gt(valuationMarks.asOfDate, closedOn))).limit(1);
+    const laterActions = await tx.select({ id: actions.id }).from(movements).innerJoin(actions, eq(actions.id, movements.actionId)).where(and(
+      eq(movements.householdId, householdId), eq(movements.investmentId, investmentId), gt(actions.effectiveDate, closedOn))).limit(1);
+    if (laterMarks.length || laterActions.length) throw new WorkflowError("close_date_conflict", "closedOn");
+    const [closed] = await tx.update(investments).set({ status: "closed", closedOn })
+      .where(and(eq(investments.householdId, householdId), eq(investments.id, investmentId), eq(investments.status, "active")))
+      .returning();
+    if (!closed) throw new WorkflowError("investment_unavailable");
+    return closed;
+  });
+}
+
+export async function getInvestmentChoices(db: Database, householdId: string) {
+  const ownerRows = await db.select({ id: owners.id, label: owners.name }).from(owners)
+    .where(eq(owners.householdId, householdId)).orderBy(asc(owners.name), asc(owners.id));
+  const lookup = (table: typeof assetClasses | typeof accountTypes | typeof taxStatuses | typeof liquidities | typeof institutions | typeof customGroups) => db.select({ id: table.id, label: table.label }).from(table)
+    .where(eq(table.householdId, householdId)).orderBy(asc(table.label), asc(table.id));
+  // This also runs inside a write transaction, whose pg connection executes one query at a time.
+  const assetClassRows = await lookup(assetClasses);
+  const accountTypeRows = await lookup(accountTypes);
+  const taxStatusRows = await lookup(taxStatuses);
+  const liquidityRows = await lookup(liquidities);
+  const institutionRows = await lookup(institutions);
+  const groupRows = await lookup(customGroups);
+  return { owners: ownerRows, assetClasses: assetClassRows, accountTypes: accountTypeRows,
+    taxStatuses: taxStatusRows, liquidities: liquidityRows, institutions: institutionRows, customGroups: groupRows };
+}
+
+async function validateInvestmentAssociations(db: Database, input: CreateInvestment) {
+  const choices = await getInvestmentChoices(db, input.householdId);
+  const associations: Array<[string, string[], Array<{ id: string }>]> = [
+    ["ownerIds", input.ownerIds, choices.owners], ["groupIds", input.groupIds ?? [], choices.customGroups],
+    ["assetClassId", input.assetClassId ? [input.assetClassId] : [], choices.assetClasses],
+    ["accountTypeId", input.accountTypeId ? [input.accountTypeId] : [], choices.accountTypes],
+    ["taxStatusId", input.taxStatusId ? [input.taxStatusId] : [], choices.taxStatuses],
+    ["liquidityId", input.liquidityId ? [input.liquidityId] : [], choices.liquidities],
+    ["institutionId", input.institutionId ? [input.institutionId] : [], choices.institutions],
+  ];
+  for (const [field, ids, valid] of associations) {
+    if (ids.some((id) => !valid.some((choice) => choice.id === id))) throw new WorkflowError("invalid_association", field);
+  }
+}
+
+export async function getInvestmentMetadata(db: Database, householdId: string, investmentId: string): Promise<InvestmentMetadata> {
+  if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(investmentId)) {
+    throw new WorkflowError("investment_unavailable");
+  }
+  const [row] = await db.select().from(investments).where(and(
+    eq(investments.householdId, householdId), eq(investments.id, investmentId)));
+  if (!row) throw new WorkflowError("investment_unavailable");
+  const ownerLinks = await db.select().from(investmentOwners).where(and(eq(investmentOwners.householdId, householdId), eq(investmentOwners.investmentId, investmentId)));
+  const groupLinks = await db.select().from(investmentGroups).where(and(eq(investmentGroups.householdId, householdId), eq(investmentGroups.investmentId, investmentId)));
+  return { id: row.id, name: row.name, status: row.status as "active" | "closed", closedOn: row.closedOn,
+    assetClassId: row.assetClassId, accountTypeId: row.accountTypeId, taxStatusId: row.taxStatusId,
+    liquidityId: row.liquidityId, institutionId: row.institutionId,
+    ownerIds: ownerLinks.map((link) => link.ownerId), groupIds: groupLinks.map((link) => link.groupId) };
+}
+
+export async function editInvestment(db: Database, input: EditInvestment) {
+  return db.transaction(async (tx) => {
+    await getInvestmentMetadata(tx, input.householdId, input.investmentId);
+    await validateInvestmentAssociations(tx, input);
+    const [investment] = await tx.update(investments).set({ name: input.name,
+      assetClassId: input.assetClassId ?? null, accountTypeId: input.accountTypeId ?? null,
+      taxStatusId: input.taxStatusId ?? null, liquidityId: input.liquidityId ?? null, institutionId: input.institutionId ?? null,
+    }).where(and(eq(investments.householdId, input.householdId), eq(investments.id, input.investmentId))).returning();
+    await tx.delete(investmentOwners).where(and(eq(investmentOwners.householdId, input.householdId), eq(investmentOwners.investmentId, input.investmentId)));
+    await tx.insert(investmentOwners).values([...new Set(input.ownerIds)].map((ownerId) => ({
+      householdId: input.householdId, investmentId: input.investmentId, ownerId,
+    })));
+    await tx.delete(investmentGroups).where(and(eq(investmentGroups.householdId, input.householdId), eq(investmentGroups.investmentId, input.investmentId)));
+    const groupIds = [...new Set(input.groupIds ?? [])];
+    if (groupIds.length) await tx.insert(investmentGroups).values(groupIds.map((groupId) => ({
+      householdId: input.householdId, investmentId: input.investmentId, groupId,
+    })));
+    return investment;
+  });
 }
 
 export async function recordExternalAction(db: Database, input: {
@@ -379,6 +456,9 @@ export async function getInvestmentHistory(db: Database, householdId: string, in
 export function createPostgresPortfolioRepository(db: Database): PortfolioRepository {
   return {
     createInvestment: (input) => createInvestment(db, input),
+    editInvestment: (input) => editInvestment(db, input),
+    getInvestmentMetadata: (householdId, investmentId) => getInvestmentMetadata(db, householdId, investmentId),
+    getInvestmentChoices: (householdId) => getInvestmentChoices(db, householdId),
     closeInvestment: (householdId, investmentId, closedOn) => closeInvestment(db, householdId, investmentId, closedOn),
     recordExternalAction: (input) => recordExternalAction(db, input),
     editExternalAction: (input) => editExternalAction(db, input),

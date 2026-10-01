@@ -4,12 +4,12 @@ import { AsOfDate, ClassificationChips, MetricUnavailable, MetricValue, Valuatio
 import { formatMoney } from "./format";
 
 export function InvestmentRow({ investment, valuation, asOfDate, classifications = [] }: {
-  investment: { id: string; name: string; status: "active" | "closed" };
+  investment: { id: string; name: string; status: "active" | "closed"; closedOn?: string | null };
   valuation?: ConstituentSnapshot["valuation"]; asOfDate?: string; classifications?: string[];
 }) {
   return <article className="investment-row">
-    <div><h2><Link href={`/investments/${encodeURIComponent(investment.id)}`}>{investment.name}</Link></h2>
-      <p className="metric-context">{investment.status === "closed" ? "Closed investment" : "Active investment"}</p>
+    <div><h2><Link href={`/investments/${encodeURIComponent(investment.id)}` + (asOfDate ? "?date=" + asOfDate : "")}>{investment.name}</Link></h2>
+      <p className="metric-context">{investment.status === "closed" ? "Closed investment · " + (investment.closedOn ?? "Close date unavailable") : "Active investment"}</p>
       {classifications.length > 0 && <ClassificationChips labels={classifications} />}</div>
     <div className="investment-row-value"><p className="metric-context">Net investment value · USD</p>
       {valuation && asOfDate ? <><MetricValue result={valuation.status === "available"

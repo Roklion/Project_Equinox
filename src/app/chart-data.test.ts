@@ -1,10 +1,11 @@
+import { createElement } from "react";
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { canonicalSources, startDate, endDate, ids, groupA, groupB } from "@/domain/analytics/testing/canonical-fixture";
 import { createAnalyticsService } from "@/application/analytics";
 const mocks = vi.hoisted(() => ({ sources: vi.fn(), household: true, date: undefined as string | undefined }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => mocks.date ? { value: mocks.date } : undefined }) }));
-vi.mock("@/components/charts/reporting-date", () => ({ ChartReportingDate: () => null }));
+vi.mock("@/components/charts/reporting-date", () => ({ ChartReportingDate: () => createElement("span", null, "browser-date-sync") }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/app/add/entry-data", () => ({
   withEntryService: (run: (context: { householdId: string }) => unknown) =>
@@ -61,4 +62,13 @@ it("waits for a valid browser calendar date instead of querying with UTC today",
   mocks.sources.mockResolvedValue(canonicalSources());
   expect(renderToStaticMarkup(await loadHistoricalCharts())).toContain("$607.80");
   expect(mocks.sources).toHaveBeenCalledExactlyOnceWith("synthetic-household", endDate);
+});
+
+it("preserves an explicit historical cutoff without a browser-today refresh", async () => {
+  mocks.sources.mockResolvedValue(canonicalSources());
+  mocks.date = "2026-10-01";
+  const historical = renderToStaticMarkup(await loadHistoricalCharts({}, endDate));
+  expect(historical).not.toContain("browser-date-sync");
+  const local = renderToStaticMarkup(await loadHistoricalCharts());
+  expect(local).toContain("browser-date-sync");
 });

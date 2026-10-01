@@ -1,4 +1,6 @@
 import "server-only";
+import { createAnalyticsService } from "@/application/analytics";
+import { createPostgresAnalyticsRepository } from "@/persistence/analytics";
 import { createPortfolioService } from "@/application/portfolio";
 import { getDatabase } from "@/persistence/database";
 import { createPostgresPortfolioRepository } from "@/persistence/records";
@@ -14,4 +16,11 @@ export async function withEntryService<T>(
   const householdId = rows[0].id;
   // Resolve the household on the server. A client-supplied ID must never select another one.
   return run({ householdId, service: createPortfolioService(createPostgresPortfolioRepository(db)) });
+}
+
+export async function withAnalyticsService<T>(
+  run: (context: { householdId: string; analytics: ReturnType<typeof createAnalyticsService> }) => Promise<T>,
+): Promise<T | null> {
+  return withEntryService(({ householdId }) => run({ householdId,
+    analytics: createAnalyticsService(createPostgresAnalyticsRepository(getDatabase().db)) }));
 }
