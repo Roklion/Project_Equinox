@@ -35,9 +35,9 @@ function money(value: string) {
   return `${negative ? "−" : ""}$${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${fraction ?? "00"}`;
 }
 
-export function HistoryPanel() {
+export function HistoryPanel({ initialInvestmentId = "" }: { initialInvestmentId?: string }) {
   const [investments, setInvestments] = useState<InvestmentOption[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(initialInvestmentId);
   const [history, setHistory] = useState<History | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);

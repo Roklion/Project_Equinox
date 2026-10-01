@@ -95,4 +95,10 @@ test("create, edit, and close an investment while preserving history", async ({ 
   expect((await page.request.post("/api/entries", { headers: { origin }, data: { kind: "contribution", investmentId, date: "2026-02-03", amount: "1" } })).status()).toBe(409);
   await page.goto("/investments");
   await expect(page.getByRole("link", { name: `${name} renamed` })).toBeVisible();
+  await page.getByRole("link", { name: `${name} renamed` }).click();
+  await page.getByRole("link", { name: "View history and corrections" }).click();
+  await expect(page.getByLabel("Investment", { exact: true })).toHaveValue(investmentId);
+  await expect(page.locator("article.history-item")).toHaveCount(2);
+  await page.goto("/investments/history");
+  await expect(page.getByLabel("Investment", { exact: true })).toHaveValue("");
 });
