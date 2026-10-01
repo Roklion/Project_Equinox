@@ -85,7 +85,7 @@ Internal transfers cancel when both sides fall inside the reporting boundary. A 
 
 ## Precision and currency
 
-MVP financial inputs and stored monetary values are USD with exact cent precision; binary floating point must not be used to store money. Additive calculations retain bigint cents from exact decimal inputs through all sums and differences, including totals beyond a single stored column's capacity. Never convert money to binary floating point for summation. Ratios and return solvers may use floating point after exact inputs are normalized; numerical tolerances and display rounding belong to those implementing tickets and presentation respectively. Snapshot outputs expose bigint cents; an HTTP/JSON adapter must encode cents as exact decimal integer strings because JSON does not serialize bigint. Financial dates are daily calendar dates, independent of operational timestamps. See [architecture](architecture.md#data-integrity) for storage conventions.
+MVP financial inputs and stored monetary values are USD with exact cent precision; binary floating point must not be used to store money. Additive calculations retain bigint cents from exact decimal inputs through all sums and differences, including totals beyond a single stored column's capacity. Never convert money to binary floating point for summation. Ratios and return solvers may use floating point after exact inputs are normalized; the implemented numerical tolerances are specified in [the return policy](#inception-return-query-and-numerical-policy), while display rounding belongs to presentation. Snapshot outputs expose bigint cents; an HTTP/JSON adapter must encode cents as exact decimal integer strings because JSON does not serialize bigint. Financial dates are daily calendar dates, independent of operational timestamps. See [architecture](architecture.md#data-integrity) for storage conventions.
 
 Multi-currency support and foreign exchange are outside the MVP. Metric labels and examples must not imply that values in different currencies can be safely summed.
 
@@ -169,3 +169,23 @@ Composition points extend those same snapshots with `breakdown` and the response
 Overlapping custom groups remain scope filters, and each matching investment participates once. Unsupported additive dimensions (including custom groups) are rejected; application composition queries report `invalid_grouping` before accessing persistence. Invalid dates and reversed ranges report `invalid_date`.
 
 For range cash-flow and performance context, callers use the existing `period` query and its authoritative start-exclusive/end-inclusive flows and endpoint snapshots. Those endpoints need not be valuation observation dates and do not create additional historical series points. MOIC/XIRR remain available through the separate inception return query. Series contain no formatting, chart configuration, persisted aggregates or cached source-of-truth values; corrections and deletions naturally change the next result.
+
+## Canonical analytics regression ledger
+
+The compact fixture in `src/domain/analytics/testing/canonical-fixture.ts` contains invented USD amounts only. It is independent of the larger demo seed. Measurements run from 2021-01-01 through 2023-01-01, two exact 365-day years; the intermediate date is 2022-01-01. Every investment has an opening mark equal to its initial contributed NAV. Opening contributions therefore belong to inception totals but are excluded from period flows.
+
+| Example | Recorded capital history | Ending gross / debt / NAV (USD) | Inception P&L (USD) | MOIC | XIRR |
+| --- | --- | --- | --- | --- | --- |
+| Active | 100 contributed at opening | 121 / 0 / 121 | 21 | 1.21 | 10% |
+| Fully realized, closed | 200 contributed at opening; 288 distributed at end | 0 / 0 / 0 | 88 | 1.44 | 20% |
+| Partially realized | 100 contributed at opening; 100 contributed and 22 distributed after one year | 206.80 / 0 / 206.80 | 28.80 | 1.144 | 10% |
+| Leveraged | 300 contributed at opening | 400 / 100 / 300 | 0 | 1 | 0% |
+| Negative equity | 50 contributed at opening | 20 / 40 / -20 | -70 | -0.4 | Unavailable: no sign change |
+
+The annual checks are `100 × 1.1² = 121`, `200 × 1.2² = 288`, and `100 × 1.1² + (100 - 22) × 1.1 = 206.80`. The leveraged example's latest mark is at the intermediate date, carried forward by 365 days at the endpoint. The active and partial examples share one joint owner-set bucket; the active example belongs to two overlapping custom groups and is selected once by their union.
+
+Household totals are gross 747.80, debt 140, NAV 607.80, inception contributions 850, distributions 310, net invested capital 540, and P&L 67.80. Beginning NAV is 750; period contributions are 100 and distributions 310, so `-142.20 NAV change = -210 net external flow + 67.80 performance`. Inception MOIC is `917.80 / 850`. For the active-plus-realized scope, MOIC is `409 / 300` and XIRR is `sqrt(409 / 300) - 1`; these differ from arithmetic child averages and the contribution-weighted child rate.
+
+A separate transfer ledger starts with 100 contributed to a source, transfers 40 after one year, and ends with source NAV 60 and destination NAV 40. Household period flow is zero; source-only period flow is -40 and destination-only flow is +40. All three scopes have zero P&L, MOIC 1 and XIRR 0%. This protects one shared transfer classification across return and change calculations.
+
+Focused variants preserve explicit missing coverage (a future-only mark), zero-contribution MOIC, XIRR without a sign change, a result outside the accepted rate limits, and fixed-guess root selection: `-100 + 230/(1+r) - 132/(1+r)²` has roots 10% and 20%, and the library policy returns 10% from its fixed guess rather than reporting ambiguity. Complete historical composition reconciles all three monetary measures with headline snapshots across every supported additive dimension. Incomplete points retain coverage without exposing a partial numeric total. Corrections are checked through application queries and the canonical PostgreSQL read adapter, including removal of a closed investment's zero terminal mark. TWR remains excluded.
