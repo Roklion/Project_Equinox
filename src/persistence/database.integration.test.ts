@@ -397,4 +397,74 @@ describe("PostgreSQL persistence", () => {
     await workflow.deleteValuationMark(home.id, joint.id, "2026-01-01");
     expect((await service.snapshot(home.id, "2026-01-02", { investmentIds: [joint.id] })).totals.status).toBe("incomplete");
   });
+  it("reads complete household actions and recomputes boundary flows and P&L after corrections", async () => {
+    const { db } = connection!;
+    const [home, other] = await db.insert(households).values([
+      { name: "Cash-flow example" }, { name: "Other cash-flow example" },
+    ]).returning();
+    const [ownerA, ownerB, outsider] = await db.insert(owners).values([
+      { householdId: home.id, name: "Owner A" }, { householdId: home.id, name: "Owner B" },
+      { householdId: other.id, name: "Other owner" },
+    ]).returning();
+    const workflow = createPortfolioService(createPostgresPortfolioRepository(db));
+    const a = await workflow.createInvestment({ householdId: home.id, name: "Joint example", ownerIds: [ownerA.id, ownerB.id] });
+    const b = await workflow.createInvestment({ householdId: home.id, name: "Other holding", ownerIds: [ownerB.id] });
+    const foreign = await workflow.createInvestment({ householdId: other.id, name: "Other example", ownerIds: [outsider.id] });
+    const [g1, g2] = await db.insert(customGroups).values([
+      { householdId: home.id, label: "Example group 1" }, { householdId: home.id, label: "Example group 2" },
+    ]).returning();
+    await db.insert(investmentGroups).values([
+      { householdId: home.id, investmentId: a.id, groupId: g1.id },
+      { householdId: home.id, investmentId: a.id, groupId: g2.id },
+    ]);
+    for (const investment of [a, b]) {
+      await workflow.recordValuationMark({ householdId: home.id, investmentId: investment.id,
+        asOfDate: "2026-01-01", grossValue: investment.id === a.id ? "100" : "0" });
+    }
+    const capital = await workflow.recordExternalAction({ householdId: home.id, investmentId: a.id,
+      kind: "contribution", effectiveDate: "2026-01-01", amount: "100" });
+    const transfer = await workflow.recordTransfer({ householdId: home.id, sourceInvestmentId: a.id,
+      destinationInvestmentId: b.id, effectiveDate: "2026-01-15", amount: "25" });
+    await workflow.recordExternalAction({ householdId: home.id, investmentId: a.id,
+      kind: "withdrawal", effectiveDate: "2026-01-31", amount: "10" });
+    await workflow.recordExternalAction({ householdId: home.id, investmentId: b.id,
+      kind: "contribution", effectiveDate: "2026-02-01", amount: "999" });
+    await workflow.recordExternalAction({ householdId: other.id, investmentId: foreign.id,
+      kind: "contribution", effectiveDate: "2026-01-15", amount: "999" });
+    await workflow.recordValuationMark({ householdId: home.id, investmentId: a.id, asOfDate: "2026-01-31", grossValue: "70" });
+    await workflow.recordValuationMark({ householdId: home.id, investmentId: b.id, asOfDate: "2026-01-31", grossValue: "25" });
+    await workflow.closeInvestment(home.id, a.id, "2026-01-31");
+    const repository = createPostgresAnalyticsRepository(db);
+    const sources = await repository.getCashFlowSources(home.id, "2026-01-31");
+    expect(sources.actions).toHaveLength(3);
+    expect(sources.actions.find((action) => action.id === transfer.id)?.movements).toHaveLength(2);
+    expect(sources.actions.find((action) => action.id === capital.id)?.movements).toHaveLength(1);
+    const analytics = createAnalyticsService(repository);
+    const household = await analytics.period(home.id, "2026-01-01", "2026-01-31");
+    expect(household.cashFlows).toEqual({ contributionsCents: 0n, distributionsCents: 1000n, netExternalCashFlowCents: -1000n });
+    expect(household.change).toMatchObject({ status: "available", value: { navChangeCents: -500n, pnlCents: 500n } });
+    const groupScope = { ownerIds: [ownerA.id], customGroupIds: [g1.id, g2.id] };
+    const selected = await analytics.period(home.id, "2026-01-01", "2026-01-31", groupScope);
+    expect(selected.ending.coverage.selectedCount).toBe(1);
+    expect(selected.cashFlows.distributionsCents).toBe(3500n);
+    expect(selected.change).toMatchObject({ status: "available", value: { pnlCents: 500n } });
+    const destination = await analytics.period(home.id, "2026-01-01", "2026-01-31", { investmentIds: [b.id] });
+    expect(destination.cashFlows.contributionsCents).toBe(2500n);
+    expect(destination.change).toMatchObject({ status: "available", value: { pnlCents: 0n } });
+    expect((await analytics.inception(home.id, "2026-01-31")).pnl).toEqual({ status: "available", value: 500n });
+    await workflow.editTransfer({ householdId: home.id, actionId: transfer.id, sourceInvestmentId: a.id,
+      destinationInvestmentId: b.id, effectiveDate: "2026-01-15", amount: "20" });
+    expect((await analytics.period(home.id, "2026-01-01", "2026-01-31", groupScope)).cashFlows.distributionsCents).toBe(3000n);
+    await workflow.deleteTransfer(home.id, transfer.id);
+    expect((await analytics.period(home.id, "2026-01-01", "2026-01-31", groupScope)).cashFlows.distributionsCents).toBe(1000n);
+    await workflow.editExternalAction({ householdId: home.id, actionId: capital.id, investmentId: a.id,
+      kind: "contribution", effectiveDate: "2026-01-01", amount: "90" });
+    expect((await analytics.inception(home.id, "2026-01-31")).netInvestedCapitalCents).toBe(8000n);
+    await workflow.deleteExternalAction(home.id, capital.id);
+    expect((await analytics.inception(home.id, "2026-01-31")).netInvestedCapitalCents).toBe(-1000n);
+    await workflow.deleteValuationMark(home.id, a.id, "2026-01-01");
+    const incomplete = await analytics.period(home.id, "2026-01-01", "2026-01-31", groupScope);
+    expect(incomplete.change).toEqual({ status: "incomplete", reason: "missing_valuation", missingInvestmentIds: [a.id] });
+    expect(incomplete.cashFlows.distributionsCents).toBe(1000n);
+  });
 });
