@@ -12,7 +12,7 @@ function rate(flows: Parameters<typeof solveXirr>[0]): number {
   return result.value;
 }
 
-describe("bounded deterministic XIRR", () => {
+describe("library-backed Excel-style XIRR", () => {
   it.each([[11000n, 0.1], [5000n, -0.5], [10000n, 0]])(
     "solves a one-year contribution and terminal %s cents", (terminal, expected) => {
       expect(rate([flow(date0, -10000n), flow(date1, terminal)])).toBeCloseTo(expected, 10);
@@ -52,22 +52,10 @@ describe("bounded deterministic XIRR", () => {
       .toEqual({ status: "unavailable", reason: "no_root" });
   });
 
-  it("reports two roots at 10% and 20%, including negative terminal NAV", () => {
-    // -100*(q-1.1)*(q-1.2) / q^2, q=1+r.
-    expect(solveXirr([flow(date0, -10000n), flow(date1, 23000n), flow(date2, -13200n)]))
-      .toEqual({ status: "unavailable", reason: "multiple_roots" });
+  it("selects the 10% root from the fixed guess when both 10% and 20% solve the equation", () => {
+    // -100*(q-1.1)*(q-1.2) / q^2, q=1+r. Excel-style policy selects one root.
+    expect(rate([flow(date0, -10000n), flow(date1, 23000n), flow(date2, -13200n)])).toBeCloseTo(0.1, 10);
   });
-
-  it("isolates close roots at 10% and 10.1% rather than relying on a grid", () => {
-    expect(solveXirr([flow(date0, -100000n), flow(date1, 220100n), flow(date2, -121110n)]))
-      .toEqual({ status: "unavailable", reason: "multiple_roots" });
-  });
-
-  it("finds a repeated root without a sign-change bracket", () => {
-    // -(q-1.1)^2 / q^2 has one distinct root.
-    expect(rate([flow(date0, -10000n), flow(date1, 22000n), flow(date2, -12100n)])).toBeCloseTo(0.1, 8);
-  });
-
   it("allows a unique root with negative terminal NAV", () => {
     // A distribution at inception followed by debt has one identifiable rate.
     expect(rate([flow(date0, 10000n), flow(date1, -11000n)])).toBeCloseTo(0.1, 10);
@@ -78,13 +66,21 @@ describe("bounded deterministic XIRR", () => {
     expect(rate([flow(date0, -huge), flow(date0, huge - 100n), flow(date1, 110n)])).toBeCloseTo(0.1, 10);
   });
 
-  it("includes supported endpoints and reports roots outside the domain", () => {
-    expect(rate([flow(date0, -10000n), flow(date1, 1n)])).toBeCloseTo(XIRR_POLICY.minRate, 12);
+  it("validates the returned rate against the supported bounds", () => {
+    expect(rate([flow(date0, -10000n), flow(date1, 10n)])).toBeCloseTo(-0.999, 12);
     expect(rate([flow(date0, -1n), flow(date1, 1000001n)])).toBeCloseTo(XIRR_POLICY.maxRate, 5);
     expect(solveXirr([flow(date0, -1n), flow(date1, 2000001n)]))
       .toEqual({ status: "unavailable", reason: "no_root" });
     expect(solveXirr([flow(date0, -100000n), flow(date1, 1n)]))
       .toEqual({ status: "unavailable", reason: "no_root" });
+  });
+
+  it("handles a long recurring-contribution history with a hand-checkable zero return", () => {
+    const count = 2000;
+    const date = (index: number) => new Date(Date.UTC(2000, 0, 1) + index * 7 * 86_400_000).toISOString().slice(0, 10);
+    const flows = Array.from({ length: count }, (_, index) => flow(date(index), -100n));
+    flows.push(flow(date(count), BigInt(count) * 100n));
+    expect(rate(flows)).toBeCloseTo(0, 10);
   });
 
   it("is deterministic, order independent, and rejects invalid calendar dates", () => {

@@ -3,7 +3,7 @@ import { assertCalendarDate } from "@/domain/financial";
 export type MetricResult<T> =
   | { status: "available"; value: T }
   | { status: "incomplete"; reason: "missing_valuation"; missingInvestmentIds: string[] }
-  | { status: "unavailable"; reason: "zero_contributions" | "no_sign_change" | "no_root" | "multiple_roots" };
+  | { status: "unavailable"; reason: "zero_contributions" | "no_sign_change" | "no_root" };
 
 /** One logical transfer, classified once relative to the reporting boundary. */
 export function classifyTransfer(
