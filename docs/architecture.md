@@ -135,4 +135,4 @@ src/application/analytics.ts validates the requested calendar date, obtains sour
 
 React, routes, and chart consumers receive analytics outputs; they do not reproduce formulas or infer zero from missing marks. HTTP adapters encode bigint cents as exact strings when needed for JSON. Formatting belongs to presentation. Historical series must reuse the same snapshot engine. Current canonical classifications apply at historical dates because association history is not modeled.
 
-TWR and approximations remain outside the current design and EPIC 3. XIRR belongs in the TypeScript/Node domain analytics layer using bounded root search plus a bracketed solver; no Python service is required solely for IRR.
+TWR and approximations remain outside the current design and EPIC 3. XIRR belongs in the TypeScript/Node domain analytics layer using the xirr library with an Excel-style fixed-guess, single-root policy. The domain adapter owns exact same-date cash-flow netting and validates the returned rate; [metrics](metrics.md#inception-return-query-and-numerical-policy) owns the numerical policy and unavailable result semantics. No Python service is required solely for IRR.
