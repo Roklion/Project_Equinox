@@ -1,3 +1,4 @@
+import { canonicalSources, endDate, expectedHousehold, fixtureId, groupA, groupB, ids, middleDate, ownerA, ownerB, startDate } from "@/domain/analytics/testing/canonical-fixture";
 import { randomUUID } from "node:crypto";
 import { asc, eq, sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
@@ -466,5 +467,66 @@ describe("PostgreSQL persistence", () => {
     const incomplete = await analytics.period(home.id, "2026-01-01", "2026-01-31", groupScope);
     expect(incomplete.change).toEqual({ status: "incomplete", reason: "missing_valuation", missingInvestmentIds: [a.id] });
     expect(incomplete.cashFlows.distributionsCents).toBe(1000n);
+  });
+
+  it("reconciles canonical ledger returns and historical series through PostgreSQL reads", async () => {
+    const { db } = connection!;
+    const sources = canonicalSources();
+    const [home] = await db.insert(households).values({ name: "Canonical analytics fixture" }).returning();
+    await db.transaction(async (tx) => {
+      await tx.insert(owners).values([ownerA, ownerB].map((owner) => ({ id: owner.id, householdId: home.id, name: owner.label })));
+      await tx.insert(customGroups).values([groupA, groupB].map((group) => ({ ...group, householdId: home.id })));
+      await tx.insert(assetClasses).values([
+        { id: fixtureId(70), householdId: home.id, label: "Example market assets" },
+        { id: fixtureId(71), householdId: home.id, label: "Example property assets" },
+      ]);
+      await tx.insert(investments).values(sources.investments.map((item) => ({ id: item.id, householdId: home.id,
+        name: item.name, status: item.status, closedOn: item.closedOn, assetClassId: item.classifications.assetClass?.id })));
+      await tx.insert(investmentOwners).values(sources.investments.flatMap((item) => item.owners.map((owner) => ({
+        householdId: home.id, investmentId: item.id, ownerId: owner.id }))));
+      await tx.insert(investmentGroups).values(sources.investments.flatMap((item) => item.customGroups.map((group) => ({
+        householdId: home.id, investmentId: item.id, groupId: group.id }))));
+      await tx.insert(valuationMarks).values(sources.marks.map((mark) => ({ ...mark, householdId: home.id })));
+      await tx.insert(actions).values(sources.actions.map((action) => ({ id: action.id, kind: action.kind, effectiveDate: action.effectiveDate, amount: action.amount, householdId: home.id })));
+      await tx.insert(movements).values(sources.actions.flatMap((action) => action.movements.map((leg) => ({
+        ...leg, householdId: home.id, actionId: action.id }))));
+    });
+    const repository = createPostgresAnalyticsRepository(db);
+    const read = await repository.getCashFlowSources(home.id, endDate);
+    expect(read.actions).toHaveLength(8);
+    expect(read.marks).toHaveLength(10);
+    expect(read.investments.find((item) => item.id === ids.active)?.owners).toHaveLength(2);
+    const service = createAnalyticsService(repository);
+    const scope = { investmentIds: [ids.active, ids.closed] };
+    const returns = await service.returns(home.id, endDate, scope);
+    expect(returns.cashFlows).toEqual({ contributionsCents: 30000n, distributionsCents: 28800n, netExternalCashFlowCents: 1200n });
+    expect(returns.moic).toEqual({ status: "available", value: 409 / 300 });
+    expect(returns.xirr.status).toBe("available");
+    if (returns.xirr.status === "available") expect(returns.xirr.value).toBeCloseTo(Math.sqrt(409 / 300) - 1, 9);
+    expect((await service.inception(home.id, endDate)).pnl).toEqual({ status: "available", value: expectedHousehold.pnl });
+    expect((await service.period(home.id, startDate, endDate)).change)
+      .toMatchObject({ status: "available", value: { navChangeCents: -14220n, netExternalCashFlowCents: -21000n, pnlCents: 6780n } });
+    const value = await service.valueSeries(home.id, startDate, endDate);
+    const composition = await service.compositionSeries(home.id, startDate, endDate, "ownerSet");
+    expect(value.points.map((point) => point.asOfDate)).toEqual([startDate, middleDate, endDate]);
+    expect(composition.points.map((point) => point.totals)).toEqual(value.points.map((point) => point.totals));
+    expect(value.points.at(-1)?.totals).toEqual({ status: "available", value: {
+      grossValueCents: 74780n, debtCents: 14000n, navCents: 60780n } });
+    expect(composition.points.at(-1)?.breakdown.find((bucket) => bucket.label === "Owner A + Owner B")?.totals)
+      .toMatchObject({ status: "available", value: { navCents: 32780n } });
+    expect((await service.returns(home.id, endDate, { customGroupIds: [groupA.id, groupB.id] })).moic)
+      .toEqual({ status: "available", value: 1.21 });
+
+    // The same fresh-read contract must update returns and series, not only snapshots.
+    await createPortfolioService(createPostgresPortfolioRepository(db)).replaceValuationMark({ householdId: home.id,
+      investmentId: ids.active, asOfDate: endDate, grossValue: "132" });
+    expect((await service.returns(home.id, endDate, scope)).moic).toEqual({ status: "available", value: 1.4 });
+    expect((await service.valueSeries(home.id, startDate, endDate)).points.at(-1)?.totals)
+      .toMatchObject({ status: "available", value: { navCents: 61880n } });
+    await deleteValuationMark(db, home.id, ids.closed, endDate);
+    // Closure does not invent a zero terminal NAV: the old $200 mark carries forward.
+    expect((await service.returns(home.id, endDate, scope)).moic).toEqual({ status: "available", value: 620 / 300 });
+    expect((await service.compositionSeries(home.id, startDate, endDate, "investment")).points.at(-1)?.totals)
+      .toMatchObject({ status: "available", value: { navCents: 81880n } });
   });
 });
