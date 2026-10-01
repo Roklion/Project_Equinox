@@ -52,7 +52,7 @@ Use these investor-perspective signs:
 
 For a portfolio, combine all qualifying dated cash flows from included investments, cancel transfers only when both legs are inside the portfolio boundary, include a boundary-relative inflow or outflow when only one leg is inside, append aggregate ending NAV, and solve once. Never average or value-weight investment-level IRRs.
 
-XIRR can be undefined or ambiguous when cash flows, including the signed terminal NAV, do not contain a sign change or yield multiple roots. Use a deterministic bounded root search and robust bracketed solver in TypeScript/Node, rather than Newton-Raphson alone. No-root and multiple-root cases return explicit unavailable reasons. Search bounds, numerical tolerances, and display rounding must be finalized in the XIRR implementation ticket (#39); do not arbitrarily select a root from an ambiguous result.
+Equinox uses an Excel-style XIRR policy: find one annualized rate from a fixed 10% guess using the xirr library in TypeScript/Node. Inputs without opposite signs and calculations that do not converge to a valid result are explicitly unavailable. Multiple mathematical roots may exist; the app accepts the converged root without enumerating or reporting ambiguity. This personal-app decision supersedes the earlier bounded-search/multiple-root requirement in EPIC 3 and issue #39. The returned-rate limits and numerical checks are specified below; display rounding belongs to presentation.
 
 ## Time-weighted return
 
@@ -124,10 +124,9 @@ The shared MetricResult<T> contract is defined in src/domain/analytics/contracts
 | incomplete | reason: missing_valuation, missingInvestmentIds | Required valuation coverage is absent; no numeric result |
 | unavailable | reason: zero_contributions | MOIC denominator is zero |
 | unavailable | reason: no_sign_change | XIRR inputs lack opposite signs |
-| unavailable | reason: no_root | No supported root found by the bounded solver |
-| unavailable | reason: multiple_roots | XIRR is ambiguous |
+| unavailable | reason: no_root | No acceptable converged library result; does not prove that no mathematical root exists |
 
-These are contracts for later metric implementations, not implementations of MOIC/XIRR in the snapshot ticket. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
+Snapshot, cash-flow, and return queries share these result states. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
 
 The authoritative calculateSnapshot path returns requested asOfDate, constituent investment metadata and valuation results, complete/incomplete totals, and coverage (selectedCount, valuedCount, missingInvestmentIds). Available constituents include markId, markAsOfDate, ageDays, grossValueCents, debtCents, and navCents. Staleness is derived at query time and never persisted.
 
@@ -139,4 +138,34 @@ The application `period` query returns beginning/ending snapshots, dated flows, 
 
 The `inception` query includes all recorded actions with effectiveDate <= asOfDate. It returns cumulative contributions/distributions, net invested capital, the as-of snapshot, and a separate P&L result. Inception P&L assumes a zero opening NAV and complete recorded capital history; it cannot reconstruct capital omitted from canonical records. Missing ending marks leave cumulative capital totals available but P&L incomplete. Closed investments are retained; closure alone never substitutes a terminal zero mark. Partial realization, distributions exceeding contributions, and negative NAV remain ordinary exact-cent results.
 
-These dated flows are reusable inputs for subsequent MOIC/XIRR work. Neither this layer nor persistence formats money, calculates percentage returns, or stores mutable aggregate results.
+The returns query reuses these dated flows for MOIC/XIRR. Cash-flow calculations and persistence do not format money or store mutable aggregate results.
+
+## Inception return query and numerical policy
+
+The application `returns(householdId, asOfDate, scope)` query reads fresh canonical sources and delegates to `calculateReturns` in `src/domain/analytics/returns.ts`. It reuses `calculateInception` for scope selection, complete logical-action classification, cumulative totals, and the terminal snapshot. The output retains those exact-cent inputs and valuation dates alongside separate `moic` and `xirr` results. Missing terminal valuation coverage makes both returns incomplete, even when capital totals are available. Zero contributions with complete coverage makes MOIC unavailable. Empty scopes have unavailable returns.
+
+MOIC adds signed aggregate NAV and cumulative distributions in bigint cents, then divides by aggregate contributions as a floating-point ratio. Negative multiples are valid. XIRR signs the boundary-relative dated flows from the investor perspective and appends signed aggregate NAV on the requested measurement date, including when the selected terminal marks are older. Same-date cash flows and terminal NAV are netted exactly in bigint cents; zero date totals are removed before numerical conversion. Both signs on distinct dates are required. A zero stream or a stream confined to one date has no identifiable annualized return (`no_sign_change`).
+
+`solveXirr` in `src/domain/analytics/xirr.ts` converts the exactly netted dated cent amounts to numerical cent units only at the library boundary, with UTC-midnight Date inputs. It uses [xirr 1.1.0](https://github.com/RayDeCampo/nodejs-xirr), whose annualized Newton-Raphson solve uses actual calendar days and a fixed 365-day year. This library evaluates sparse dated transactions directly instead of expanding the history into a daily polynomial.
+
+The fixed initial annual guess is `0.1` (10%), relative step tolerance `1e-10`, and iteration limit 100. The library returns one root from that guess; there is no custom root isolation, derivative recursion, initial-guess retry search or multiple-root detection. This is an Excel-style selection policy, not a promise of bit-for-bit Excel parity. Exact zero and negative rates remain ordinary available values when convergence succeeds.
+
+Returned rates must be finite and within inclusive `-0.9999 <= r <= 1,000,000` (-99.99% to 100,000,000%). These limits validate the result; they are not enforced search brackets. The adapter independently evaluates the dated NPV equation and requires a finite residual no larger than `1e-8` times the sum of absolute discounted flows. A library exception, non-convergence, non-finite/out-of-range rate or failed residual check returns `no_root`. That reason means no acceptable result was obtained; a mathematical root may still exist. Results are deterministic for the same canonical inputs and policy, unrounded, and recalculated rather than persisted.
+
+Returns are inception-to-date from complete recorded capital history, with no persisted or cached source-of-truth fields. Corrections or deletions of actions and marks change the next calculation naturally. The same query supports the existing owner, classification, investment and custom-group filters and retains closed investments. It never averages child rates or multiples.
+
+Regression tests include hand-checkable annual and leap-year cases, multiple contributions, partial/closed realization, transfer boundaries, missing marks, negative NAV, fixed-guess selection for a two-root example, non-convergence, returned-rate limits, long recurring histories, and [Microsoft's published irregular-date XIRR example](https://support.microsoft.com/en-us/excel/functions/xirr-function). No UI percentage rounding or TWR calculation is introduced.
+
+## Historical value and composition queries
+
+The application exposes `valueSeries(householdId, startDate, endDate, scope)` and `compositionSeries(householdId, startDate, endDate, groupBy, scope)`. Both read canonical snapshot sources once through `endDate`, retaining older marks for carry-forward. Domain calculations live in `src/domain/analytics/series.ts` and reuse `calculateSnapshot` and `groupSnapshot`. Every point exposes all three exact-cent measures (`grossValueCents`, `debtCents`, `navCents`); callers choose the measure to render without financial recomputation.
+
+Historical sampling uses the sorted, deduplicated union of persisted valuation dates for investments selected by the existing snapshot scope. The date range is inclusive: `startDate <= observationDate <= endDate`. An observation shared by several investments creates one point. Unselected investments' dates never create points. Marks before `startDate` remain available for valuation alignment at later observations; future marks never participate. There is no interpolation, daily resampling, or synthetic endpoint. A same-day range returns that day's observation if present. A range with no selected observations, including an empty scope, returns `points: []`; this means no observations in the range, not a zero-valued portfolio. Call the snapshot query separately when a boundary value is needed.
+
+Value points are full snapshot outputs, including `asOfDate`, totals, coverage and constituents with actual mark dates and age in calendar days. Missing coverage leaves the point incomplete, with no numeric aggregate subtotal. Closed investments remain selected and older marks carry forward according to the same policy as headline snapshots.
+
+Composition points extend those same snapshots with `breakdown` and the response identifies `groupBy`. Supported dimensions are investment, asset class, account type, tax status, liquidity, institution and owner-set. Each complete point's segment gross value, debt and NAV sum exactly to that point's aggregate totals. Incomplete buckets retain their coverage; complete buckets can be inspected without implying a complete aggregate. Joint owners form one deterministic owner-set bucket. Current canonical classification and membership metadata applies to all historical points; historical classification changes are not modeled.
+
+Overlapping custom groups remain scope filters, and each matching investment participates once. Unsupported additive dimensions (including custom groups) are rejected; application composition queries report `invalid_grouping` before accessing persistence. Invalid dates and reversed ranges report `invalid_date`.
+
+For range cash-flow and performance context, callers use the existing `period` query and its authoritative start-exclusive/end-inclusive flows and endpoint snapshots. Those endpoints need not be valuation observation dates and do not create additional historical series points. MOIC/XIRR remain available through the separate inception return query. Series contain no formatting, chart configuration, persisted aggregates or cached source-of-truth values; corrections and deletions naturally change the next result.

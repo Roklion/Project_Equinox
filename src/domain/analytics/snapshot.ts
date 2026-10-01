@@ -97,8 +97,16 @@ function bucketIdentity(investment: AnalyticsInvestment, dimension: GroupingDime
     label: classification?.label ?? "Unclassified" };
 }
 
+/** Only mutually additive dimensions may be used as composition segments. */
+export function assertGroupingDimension(dimension: unknown): asserts dimension is GroupingDimension {
+  if (dimension !== "investment" && dimension !== "ownerSet"
+    && !classificationDimensions.some((supported) => supported === dimension)) {
+    throw new Error("Unsupported additive grouping dimension.");
+  }
+}
 /** Every constituent enters exactly one bucket. Custom groups are intentionally filters only. */
 export function groupSnapshot(snapshot: Snapshot, dimension: GroupingDimension): SnapshotBucket[] {
+  assertGroupingDimension(dimension);
   const buckets = new Map<string, { label: string; constituents: ConstituentSnapshot[] }>();
   for (const item of snapshot.constituents) {
     const { key, label } = bucketIdentity(item.investment, dimension);
