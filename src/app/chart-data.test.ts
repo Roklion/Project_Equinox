@@ -2,7 +2,9 @@ import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { canonicalSources, startDate, endDate, ids, groupA, groupB } from "@/domain/analytics/testing/canonical-fixture";
 import { createAnalyticsService } from "@/application/analytics";
-const mocks = vi.hoisted(() => ({ sources: vi.fn(), household: true }));
+const mocks = vi.hoisted(() => ({ sources: vi.fn(), household: true, date: undefined as string | undefined }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => mocks.date ? { value: mocks.date } : undefined }) }));
+vi.mock("@/components/charts/reporting-date", () => ({ ChartReportingDate: () => null }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/app/add/entry-data", () => ({
   withEntryService: (run: (context: { householdId: string }) => unknown) =>
@@ -46,4 +48,17 @@ it("validates combined historical query before reads and supports custom groups 
   const grouped = await service.historicalSeries("h", startDate, endDate, { customGroupIds: [groupA.id, groupB.id] });
   expect(grouped.valueSeries.points.at(-1)!.totals).toMatchObject({ value: { navCents: 12100n } });
   expect(grouped.compositionSeries.ownerSet.points.at(-1)!.breakdown).toHaveLength(1);
+});
+
+it("waits for a valid browser calendar date instead of querying with UTC today", async () => {
+  mocks.sources.mockClear();
+  for (const date of [undefined, "2026-02-30", "not-a-date"]) {
+    mocks.date = date;
+    expect(renderToStaticMarkup(await loadHistoricalCharts())).toContain("Preparing your local reporting date");
+  }
+  expect(mocks.sources).not.toHaveBeenCalled();
+  mocks.date = endDate;
+  mocks.sources.mockResolvedValue(canonicalSources());
+  expect(renderToStaticMarkup(await loadHistoricalCharts())).toContain("$607.80");
+  expect(mocks.sources).toHaveBeenCalledExactlyOnceWith("synthetic-household", endDate);
 });
