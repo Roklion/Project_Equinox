@@ -17,7 +17,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 ## Status
 
-The foundation includes a responsive shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, installable PWA metadata, canonical financial domain tables, and persistence/application services for investment lifecycle, actions, valuations, and history queries. The primary Add launcher supports contribution, withdrawal, transfer, and single-investment valuation entry for an existing household and investment set. Batch valuation and correction history surfaces are implemented on the EPIC 2 dependency branch; charts remain future work. Offline financial-data behavior is intentionally deferred.
+The foundation includes a responsive shell, responsibility boundaries, unit tests, a PostgreSQL connection adapter, versioned migration tooling, database integration tests, password-only authentication, installable PWA metadata, canonical financial domain tables, and persistence/application services for investment lifecycle, actions, valuations, and history queries. The primary Add launcher supports contribution, withdrawal, transfer, and single-investment valuation entry for an existing household and investment set. Batch valuation and correction history surfaces are implemented on the EPIC 2 dependency branch; point-in-time analytics provide exact gross/debt/NAV snapshots, explicit valuation coverage, and additive classification/owner-set breakdowns through a separate read boundary. Return calculations and charts remain future work. Offline financial-data behavior is intentionally deferred.
 
 ## Local setup
 

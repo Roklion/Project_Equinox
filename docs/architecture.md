@@ -23,7 +23,7 @@ This scope still calls for meaningful financial-data integrity and privacy: exac
 The eventual implementation should keep these responsibilities distinct:
 
 - **Presentation:** responsive pages, accessible components, forms, and chart interactions.
-- **Application workflows:** commands and queries for recording actions, batch marks, investment lifecycle, and views.
+- **Application workflows:** commands and queries for recording actions, batch marks, investment lifecycle, and views; separate read-oriented analytics queries.
 - **Domain:** financial invariants, transfer boundaries, metric inputs, and lifecycle rules defined in [the data model](data-model.md) and [metrics](metrics.md).
 - **Persistence:** PostgreSQL schemas, transactions, migrations, and repositories.
 - **Analytics:** deterministic calculations that operate on dated values and cash flows without depending on UI components.
@@ -114,7 +114,6 @@ Use focused unit tests for deterministic domain calculations, integration tests 
 
 
 - monetary column capacity, input handling beyond cent precision, and calculated/display rounding;
-- valuation alignment across calendar dates;
 - presentation details for action correction and deletion confirmation;
 - offline and client-cache boundaries;
 - PostgreSQL backup and recovery; and
@@ -125,3 +124,15 @@ Multi-currency support and foreign exchange are outside the USD-only MVP.
 ## Authentication boundary
 
 The personal MVP uses one shared password, verified on the server with Node's scrypt KDF against `APP_PASSWORD_HASH`. A signed, seven-day HttpOnly cookie and a matching server-side session record grant access to the single household. The route proxy denies unauthenticated application and API requests, while login and logout endpoints remain reachable to handle authentication state. Auth code remains separate from investment/domain types. PostgreSQL stores a hash of each active session token and HMAC-keyed failed-login buckets for 15-minute throttling. It stores no password or financial data. Authentication fails closed if database or authentication configuration is unavailable, and server logs use fixed messages without driver details or secret values. The browser receives no password hash or signing key. Logout revokes the current token and clears its browser cookie on success; if revocation fails, it returns 503 and preserves the token so the browser can retry. Other browser sessions remain independent. See [local setup](../README.md#authentication) for secret generation and deployment configuration.
+
+## Analytics read boundary
+
+EPIC 3 analytics use the application-owned AnalyticsRepository in src/application/analytics-ports.ts, separate from PortfolioRepository mutation and entry workflows established in #25. The initial getSnapshotSources(householdId, throughDate) port supplies household-scoped investments (including closed lifecycle state), stable classification IDs/labels, owner associations, custom-group memberships, and canonical valuation marks through the requested date. Later cash-flow tickets can extend the analytics read port with canonical actions/movements without moving financial formulas into persistence.
+
+src/persistence/analytics.ts implements the port with PostgreSQL reads. It does not aggregate money or select financial results. Association reads stay separate from valuation rows to avoid owner/group join fan-out; a read-only repeatable-read transaction gives these related reads one consistent canonical view. No aggregate tables, mutable calculated fields, or persisted staleness values are introduced.
+
+src/application/analytics.ts validates the requested calendar date, obtains source records, and invokes the deterministic src/domain/analytics/snapshot.ts engine. That engine owns reporting-scope selection, latest-on-or-before mark alignment, exact-cent gross/debt/NAV calculations, coverage metadata, and additive grouping. Domain contracts own period membership and logical transfer classification for later P&L, MOIC, XIRR, and delta consumers. [Metrics](metrics.md) owns these financial semantics and result states.
+
+React, routes, and chart consumers receive analytics outputs; they do not reproduce formulas or infer zero from missing marks. HTTP adapters encode bigint cents as exact strings when needed for JSON. Formatting belongs to presentation. Historical series must reuse the same snapshot engine. Current canonical classifications apply at historical dates because association history is not modeled.
+
+TWR and approximations remain outside the current design and EPIC 3. XIRR belongs in the TypeScript/Node domain analytics layer using bounded root search plus a bracketed solver; no Python service is required solely for IRR.

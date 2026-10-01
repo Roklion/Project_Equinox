@@ -10,7 +10,9 @@ For an investment at an as-of date:
 - **Investment debt** is debt directly linked to that investment.
 - **Net investment value (NAV)** = gross value - investment debt.
 
-Negative NAV is valid. Values shown for any investment or aggregate must communicate the effective as-of date. The rule for aligning investments with different mark dates must be chosen before implementation.
+Negative NAV is valid. A snapshot at calendar date D selects each investment's latest persisted mark with as-of date <= D. Never use a future mark or interpolate. Carry-forward is allowed, including for closed investments; closing does not synthesize a zero valuation. Preserve the actual mark date and derive age in calendar days relative to D. Values shown for any investment or aggregate must communicate the requested effective date and make constituent mark dates available.
+
+A selected investment with no qualifying mark has missing valuation coverage, not zero value. The aggregate is incomplete and has no numeric totals if any selected investment lacks a mark. Consumers can inspect available constituents but must not present their subtotal as the complete scope value. An empty selection is complete with zero totals and selectedCount = 0.
 
 **Household net worth** is a broader concept: all household assets minus all household liabilities. Equinox's investment NAV can contribute to household net worth, but the two terms are not interchangeable. Unless non-investment assets and liabilities are modeled, the product must not label aggregate investment NAV as household net worth.
 
@@ -26,7 +28,7 @@ Internal transfers are visible as investment-level movements but net to zero at 
 
 ## Profit and multiple
 
-For a period ending at a selected as-of date:
+For a period from startDate through endDate, beginning NAV is the snapshot at startDate and ending NAV is the snapshot at endDate. Period cash flows satisfy startDate < effectiveDate <= endDate. The same convention applies to P&L, NAV changes, and external-flow/performance decomposition. A same-day period contains no flows; a reversed range is invalid. Missing required endpoint valuation coverage makes the dependent metric incomplete.
 
 - **P&L** = ending NAV + distributions during the period - contributions during the period - beginning NAV.
 - **Inception-to-date P&L**, where beginning NAV is zero, = current NAV + cumulative distributions - cumulative contributions.
@@ -50,11 +52,11 @@ Use these investor-perspective signs:
 
 For a portfolio, combine all qualifying dated cash flows from included investments, cancel transfers only when both legs are inside the portfolio boundary, include a boundary-relative inflow or outflow when only one leg is inside, append aggregate ending NAV, and solve once. Never average or value-weight investment-level IRRs.
 
-XIRR can be undefined or ambiguous when cash flows, including the signed terminal NAV, do not contain a sign change or yield multiple roots. Solver choice, convergence bounds, multiple-root policy, and user-facing unavailable states must be specified during implementation.
+XIRR can be undefined or ambiguous when cash flows, including the signed terminal NAV, do not contain a sign change or yield multiple roots. Use a deterministic bounded root search and robust bracketed solver in TypeScript/Node, rather than Newton-Raphson alone. No-root and multiple-root cases return explicit unavailable reasons. Search bounds, numerical tolerances, and display rounding must be finalized in the XIRR implementation ticket (#39); do not arbitrarily select a root from an ambiguous result.
 
 ## Time-weighted return
 
-Time-weighted return (TWR) is optional and outside the initial MVP. If added, it should chain subperiod returns divided at external cash flows and use a documented policy for valuations at flow boundaries. TWR should remain distinct from XIRR: it answers how the investment performed independent of the size and timing of investor cash flows.
+Time-weighted return (TWR) is outside the current Equinox design and EPIC 3 MVP. Do not implement TWR or approximations. EPIC 3 return analytics use XIRR / money-weighted return.
 
 ## Change decomposition
 
@@ -76,13 +78,55 @@ Internal transfers cancel when both sides fall inside the reporting boundary. A 
 ## Aggregation rules
 
 - Sum additive measures such as gross value, debt, NAV, contributions, distributions, net invested capital, and P&L over the selected underlying records.
-- Recompute ratios and returns from aggregated inputs. Do not average child MOIC, XIRR, or future TWR values.
+- Recompute ratios and returns from aggregated inputs. Do not average child MOIC or XIRR values.
 - Respect the selected reporting boundary when determining whether a transfer is internal.
 - Retain closed investments when their history falls within the requested period.
 - Expose unavailable results explicitly when inputs cannot support a valid calculation.
 
 ## Precision and currency
 
-MVP financial inputs and stored monetary values are USD with exact cent precision; binary floating point must not be used to store money. Calculated-metric precision and display rounding remain decisions for the metric implementations. Financial dates are daily calendar dates, independent of operational timestamps. See [architecture](architecture.md#data-integrity) for storage conventions.
+MVP financial inputs and stored monetary values are USD with exact cent precision; binary floating point must not be used to store money. Additive calculations retain bigint cents from exact decimal inputs through all sums and differences, including totals beyond a single stored column's capacity. Never convert money to binary floating point for summation. Ratios and return solvers may use floating point after exact inputs are normalized; numerical tolerances and display rounding belong to those implementing tickets and presentation respectively. Snapshot outputs expose bigint cents; an HTTP/JSON adapter must encode cents as exact decimal integer strings because JSON does not serialize bigint. Financial dates are daily calendar dates, independent of operational timestamps. See [architecture](architecture.md#data-integrity) for storage conventions.
 
 Multi-currency support and foreign exchange are outside the MVP. Metric labels and examples must not imply that values in different currencies can be safely summed.
+
+## Shared reporting-boundary contracts
+
+Classify one logical transfer against the selected investment-ID set using the domain function classifyTransfer:
+
+| Included investments | Classification | External effect |
+| --- | --- | --- |
+| Source and destination | internal | Zero |
+| Destination only | contribution | Inflow |
+| Source only | distribution | Outflow |
+| Neither | excluded | None |
+
+P&L, MOIC, XIRR, and delta attribution must consume this classification rather than each implementing transfer-boundary logic. Valuation marks never enter this classification or cash-flow inputs. Period consumers use isInPeriod for the start-exclusive/end-inclusive convention above.
+
+## Snapshot scopes and additive breakdowns
+
+The application snapshot query accepts a household, requested calendar date, and optional investment-ID, owner-ID, custom-group-ID, and classification-ID filters. Values within a filter are OR matches; different filters intersect (AND). An absent filter imposes no restriction; an empty supplied filter matches nothing. Owner filters match any associated owner and include each matching investment once. Classifications and memberships use their current canonical identities/labels, including for historical snapshots; classification history is not modeled.
+
+Additive breakdowns support investment, asset class, account type, tax status, liquidity, institution, and owner-set. Each selected investment contributes to exactly one bucket per dimension. Classification buckets use stable IDs, not labels; missing classifications use an explicit Unclassified bucket. Renaming a label does not change bucket identity.
+
+For ownership, sort stable owner IDs to form one deterministic owner-set bucket; display the associated names in that same order (for example Owner A + Owner B). Joint investments appear once, with no invented percentages and no duplicate full value in each owner's bucket. Ownership percentages are not modeled.
+
+Custom groups may overlap and select scopes by membership. Matching several groups still includes an investment once. Custom groups are not an additive breakdown dimension: separate overlapping group totals must not be presented as composition segments expected to sum to the household. Such a breakdown requires a future exclusivity/allocation model.
+
+Each bucket follows the same coverage rules as the aggregate. A bucket with missing marks is incomplete, while fully valued buckets may retain available totals. For complete snapshots, every supported additive breakdown reconciles gross value, debt, and NAV to the aggregate.
+
+## Presentation-neutral result states
+
+The shared MetricResult<T> contract is defined in src/domain/analytics/contracts.ts:
+
+| Status | Payload | Meaning |
+| --- | --- | --- |
+| available | value | Valid result; zero and negative values remain ordinary values |
+| incomplete | reason: missing_valuation, missingInvestmentIds | Required valuation coverage is absent; no numeric result |
+| unavailable | reason: zero_contributions | MOIC denominator is zero |
+| unavailable | reason: no_sign_change | XIRR inputs lack opposite signs |
+| unavailable | reason: no_root | No supported root found by the bounded solver |
+| unavailable | reason: multiple_roots | XIRR is ambiguous |
+
+These are contracts for later metric implementations, not implementations of MOIC/XIRR in the snapshot ticket. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
+
+The authoritative calculateSnapshot path returns requested asOfDate, constituent investment metadata and valuation results, complete/incomplete totals, and coverage (selectedCount, valuedCount, missingInvestmentIds). Available constituents include markId, markAsOfDate, ageDays, grossValueCents, debtCents, and navCents. Staleness is derived at query time and never persisted.
