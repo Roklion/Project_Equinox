@@ -63,6 +63,8 @@ An investment-history correction may also change a mark's as-of date while retai
 
 ## Lifecycle
 
+Creation requires a display name and at least one household owner, but no opening financial record. Metadata editing retains the investment ID and replaces current owner/classification/custom-group associations without rewriting actions or valuations; optional classifications and groups can be cleared. Closed investments may also have their metadata edited, preserving lifecycle status and close date. All selected records must belong to the same household. Closing requires an explicit calendar date on or after all recorded actions and valuations; an earlier date is rejected while history remains unchanged.
+
 An investment can be active or closed. Closing stops ordinary forward data entry after the close date but does not delete actions, marks, classifications, or historical participation in portfolio calculations. Closure itself does not imply full realization or create a zero terminal valuation: fully realized history requires its recorded distributions and an explicit zero mark. Deleting that mark restores latest-on-or-before alignment with any older qualifying mark. Historical actions and marks on or before the close date may be entered or explicitly corrected. Reopening behavior remains a future product decision.
 
 ## Invariants
