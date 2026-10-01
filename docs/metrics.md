@@ -130,3 +130,13 @@ The shared MetricResult<T> contract is defined in src/domain/analytics/contracts
 These are contracts for later metric implementations, not implementations of MOIC/XIRR in the snapshot ticket. Never encode an unavailable result as zero, infinity, NaN, or an unexplained null.
 
 The authoritative calculateSnapshot path returns requested asOfDate, constituent investment metadata and valuation results, complete/incomplete totals, and coverage (selectedCount, valuedCount, missingInvestmentIds). Available constituents include markId, markAsOfDate, ageDays, grossValueCents, debtCents, and navCents. Staleness is derived at query time and never persisted.
+
+## Cash-flow and change query outputs
+
+`classifyCashFlows` in `src/domain/analytics/cash-flow.ts` converts complete canonical logical actions into dated boundary-relative contributions/distributions using the shared `classifyTransfer` contract. Both transfer legs must be supplied before scope selection. Incomplete action shapes or disagreeing amounts fail rather than yielding partial totals. Canonical reads must include all actions and complete linked movements through the requested end/as-of date; repository failures reject the query instead of returning numeric results.
+
+The application `period` query returns beginning/ending snapshots, dated flows, exact cash-flow totals, and a `MetricResult<PeriodChange>`. Available change results include beginning NAV, ending NAV, NAV change, net external cash flow, investment performance effect, and P&L (equal to the performance effect). Incomplete change results contain no numeric value and identify the union of investments missing either endpoint; each snapshot retains its own coverage metadata. Cash-flow totals remain available independently of valuation coverage. An empty scope returns zero totals; a same-day period has zero flows and, when valued, zero change.
+
+The `inception` query includes all recorded actions with effectiveDate <= asOfDate. It returns cumulative contributions/distributions, net invested capital, the as-of snapshot, and a separate P&L result. Inception P&L assumes a zero opening NAV and complete recorded capital history; it cannot reconstruct capital omitted from canonical records. Missing ending marks leave cumulative capital totals available but P&L incomplete. Closed investments are retained; closure alone never substitutes a terminal zero mark. Partial realization, distributions exceeding contributions, and negative NAV remain ordinary exact-cent results.
+
+These dated flows are reusable inputs for subsequent MOIC/XIRR work. Neither this layer nor persistence formats money, calculates percentage returns, or stores mutable aggregate results.
