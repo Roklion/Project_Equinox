@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "test:db": "vitest run --config vitest.db.config.ts",
     "test:e2e": "playwright test",
+    "test:presentation": "playwright test --config playwright.presentation.config.ts",
     "db:up": "docker compose --env-file .env.local up -d --wait",
     "db:down": "docker compose --env-file .env.local down",
     "db:generate": "drizzle-kit generate",

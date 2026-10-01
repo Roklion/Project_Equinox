@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { AppNavigation } from "./app-navigation";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <span className="header-caption">A clearer view of your investments</span>
       </header>
+      <AppNavigation />
       <main id="main-content" tabIndex={-1}>{children}</main>
       <footer className="site-footer">Perspective for the long term.</footer>
     </div>
