@@ -20,6 +20,8 @@ This scope still calls for meaningful financial-data integrity and privacy: exac
 
 ## Responsibility boundaries
 
+Investment management extends the existing portfolio service and repository port with full metadata replacement, current metadata, and household-scoped owner/classification choices. Creation writes the investment and owner/custom-group links atomically; editing updates metadata and replaces associations in one transaction without touching financial rows. Lifecycle and association conflicts use stable `WorkflowError` codes (with a field key when applicable), and the investment API translates them into field-level feedback without exposing database errors. Routes reuse the server-side single-household composition root; client-supplied household IDs cannot select a household. See [management interaction rules](design-system.md#input-workflows).
+
 The eventual implementation should keep these responsibilities distinct:
 
 - **Presentation:** responsive pages, accessible components, forms, and chart interactions.

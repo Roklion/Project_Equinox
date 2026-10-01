@@ -3,8 +3,23 @@ import type { ClassificationId, HouseholdId, InvestmentId, OwnerId } from "@/dom
 
 export type CreateInvestment = {
   householdId: HouseholdId; name: string; ownerIds: OwnerId[];
-  assetClassId?: ClassificationId; accountTypeId?: ClassificationId;
-  taxStatusId?: ClassificationId; liquidityId?: ClassificationId; institutionId?: ClassificationId;
+  assetClassId?: ClassificationId | null; accountTypeId?: ClassificationId | null;
+  taxStatusId?: ClassificationId | null; liquidityId?: ClassificationId | null; institutionId?: ClassificationId | null;
+  groupIds?: ClassificationId[];
+};
+/** Full metadata replacement; omitted classifications/groups are cleared. */
+export type EditInvestment = CreateInvestment & { investmentId: InvestmentId };
+export type InvestmentMetadata = Omit<CreateInvestment, "householdId"> & {
+  id: InvestmentId; status: "active" | "closed"; closedOn: string | null; groupIds: ClassificationId[];
+};
+export type InvestmentChoices = {
+  owners: Array<{ id: string; label: string }>;
+  assetClasses: Array<{ id: string; label: string }>;
+  accountTypes: Array<{ id: string; label: string }>;
+  taxStatuses: Array<{ id: string; label: string }>;
+  liquidities: Array<{ id: string; label: string }>;
+  institutions: Array<{ id: string; label: string }>;
+  customGroups: Array<{ id: string; label: string }>;
 };
 export type RecordExternalAction = {
   householdId: HouseholdId; investmentId: InvestmentId;
@@ -59,6 +74,9 @@ export type StoredMark = {
 /** Application-owned contract: no SQL, Drizzle, or framework request types. */
 export interface PortfolioRepository {
   createInvestment(input: CreateInvestment): Promise<{ id: InvestmentId }>;
+  editInvestment(input: EditInvestment): Promise<{ id: InvestmentId }>;
+  getInvestmentMetadata(householdId: HouseholdId, investmentId: InvestmentId): Promise<InvestmentMetadata>;
+  getInvestmentChoices(householdId: HouseholdId): Promise<InvestmentChoices>;
   closeInvestment(householdId: HouseholdId, investmentId: InvestmentId, closedOn: string): Promise<{ id: InvestmentId }>;
   recordExternalAction(input: RecordExternalAction): Promise<{ id: string }>;
   editExternalAction(input: EditExternalAction): Promise<{ id: string }>;

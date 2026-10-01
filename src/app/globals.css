@@ -1,3 +1,5 @@
+@import "../components/investment/investment-management.css";
+
 :root {
   color-scheme: light;
   --color-canvas: #f6f7f3;

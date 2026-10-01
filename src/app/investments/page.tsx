@@ -16,9 +16,10 @@ export default async function InvestmentsPage() {
       action={<Link href="/investments">Try again</Link>}>Please try again. Your records have not changed.</SurfaceState></>;
   }
   return <><section className="page-heading"><p className="eyebrow">Your tracked investments</p><h1>Investments</h1>
-    <p className="introduction">Browse active and closed investments and open their details.</p></section>
+    <p className="introduction">Browse active and closed investments and maintain their metadata.</p>
+    <Link className="primary-button" href="/investments/new">Add investment</Link></section>
     {!investments?.length ? <SurfaceState kind="empty" title="No investments available">
-      Investment creation and financial summaries will arrive in the next product updates.</SurfaceState>
+      Create an investment after household owners are configured. Financial summaries will arrive in later updates.</SurfaceState>
       : <div className="investment-list">{investments.map((investment) => <InvestmentRow key={investment.id}
         investment={investment} classifications={[investment.assetClass, investment.accountType].filter((label): label is string => label !== null)} />)}</div>}
     <div className="entry-actions"><Link href="/investments/history">Investment history and corrections</Link></div>

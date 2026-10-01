@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import InvestmentsPage from "./page";
 import InvestmentDetailPage from "./[investmentId]/page";
 import InvestmentHistoryPage from "./history/page";
+import { WorkflowError } from "@/application/errors";
 import type { InvestmentOption } from "@/application/ports";
 
-const mocks = vi.hoisted(() => ({ getInvestments: vi.fn(), householdAvailable: true }));
+const mocks = vi.hoisted(() => ({ getInvestmentMetadata: vi.fn(), getInvestmentChoices: vi.fn(), getInvestments: vi.fn(), householdAvailable: true }));
 vi.mock("@/app/add/entry-data", () => ({
   withEntryService: (run: (context: unknown) => unknown) => mocks.householdAvailable
-    ? run({ householdId: "synthetic-household", service: { getInvestments: mocks.getInvestments } }) : null,
+    ? run({ householdId: "synthetic-household", service: { getInvestments: mocks.getInvestments, getInvestmentMetadata: mocks.getInvestmentMetadata, getInvestmentChoices: mocks.getInvestmentChoices } }) : null,
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("not-found"); } }));
 
@@ -17,7 +18,10 @@ const record: InvestmentOption = { id: "synthetic-investment", name: "Example in
   liquidity: null, institution: null };
 
 beforeEach(() => {
+  vi.resetAllMocks();
   mocks.householdAvailable = true;
+  mocks.getInvestmentMetadata.mockResolvedValue({ ...record, ownerIds: ["owner"], groupIds: ["group"], assetClassId: "asset" });
+  mocks.getInvestmentChoices.mockResolvedValue({ owners: [{ id: "owner", label: "Example owner" }], assetClasses: [{ id: "asset", label: "Example asset class" }], customGroups: [{ id: "group", label: "Example group" }], accountTypes: [], taxStatuses: [], liquidities: [], institutions: [] });
   mocks.getInvestments.mockResolvedValue([record]);
 });
 
@@ -27,6 +31,7 @@ describe("investment route foundations", () => {
     expect(mocks.getInvestments).toHaveBeenCalledWith("synthetic-household");
     expect(html).toContain('href="/investments/synthetic-investment"');
     expect(html).toContain("Closed investment");
+    expect(html).toContain('href="/investments/new"');
     expect(html).toContain("Financial summaries will be connected");
     expect(html).not.toContain("$0.00");
   });
@@ -41,6 +46,7 @@ describe("investment route foundations", () => {
 
   it("does not expose database error details", async () => {
     mocks.getInvestments.mockRejectedValue(new Error("PRIVATE_DATABASE_DETAIL"));
+    mocks.getInvestmentMetadata.mockRejectedValue(new Error("PRIVATE_DATABASE_DETAIL"));
     for (const page of [await InvestmentsPage(), await InvestmentDetailPage({ params: Promise.resolve({ investmentId: record.id }) })]) {
       const html = renderToStaticMarkup(page);
       expect(html).toContain('role="alert"');
@@ -54,13 +60,17 @@ describe("investment route foundations", () => {
     expect(html).toContain("Closed on 2026-09-01");
     expect(html).toContain("Example asset class");
     expect(html).toContain("Not specified");
+    expect(html).toContain("Example owner");
+    expect(html).toContain("Example group");
+    expect(html).toContain('href="/investments/synthetic-investment/manage"');
     expect(html).toContain('href="/investments/history?investmentId=synthetic-investment"');
   });
 
   it("returns not-found for an unknown investment without crossing household scope", async () => {
+    mocks.getInvestmentMetadata.mockRejectedValue(new WorkflowError("investment_unavailable"));
     await expect(InvestmentDetailPage({ params: Promise.resolve({ investmentId: "another-household-investment" }) }))
       .rejects.toThrow("not-found");
-    expect(mocks.getInvestments).toHaveBeenCalledWith("synthetic-household");
+    expect(mocks.getInvestmentMetadata).toHaveBeenCalledWith("synthetic-household", "another-household-investment");
   });
 
   it("passes detail context to the existing history owner and ignores repeated query parameters", async () => {

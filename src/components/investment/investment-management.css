@@ -1,0 +1,17 @@
+.investment-management { display: grid; gap: var(--space-3); max-width: 45rem; }
+.investment-management .text-button { min-height: 48px; }
+.investment-fields { display: grid; gap: var(--space-3); min-width: 0; margin: 0; padding: 0; border: 0; }
+.investment-options { min-width: 0; margin: 0; padding: 0; border: 0; }
+.investment-options legend { font-weight: 700; }
+.investment-options label { display: flex; align-items: center; gap: var(--space-2); min-height: 48px; cursor: pointer; }
+.investment-options input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex-shrink: 0; accent-color: var(--color-accent); }
+.investment-management input:focus-visible, .investment-management select:focus-visible, .investment-management button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+.investment-classifications { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.investment-management-list { display: grid; gap: var(--space-2); list-style: none; padding: 0; }
+.investment-management-list li { display: grid; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-small); background: var(--color-surface); }
+.investment-management-list a { display: flex; align-items: center; min-height: 48px; font-weight: 700; overflow-wrap: anywhere; }
+.investment-management-list span { color: var(--color-muted); }
+.investment-metadata div { display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-2); padding-block: var(--space-1); border-bottom: 1px solid var(--color-border); }
+.investment-metadata dt { color: var(--color-muted); }
+.investment-metadata dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 40rem) { .investment-classifications, .investment-metadata div { grid-template-columns: 1fr; } }
