@@ -26,7 +26,7 @@ Supported classification dimensions include:
 - institution; and
 - custom groups.
 
-Classifications should use stable identities so labels can change without rewriting history.
+Classifications should use stable identities so labels can change without rewriting economic history. Classification and membership history is not modeled: historical analytics use current canonical associations. Owners are many-to-many without percentage allocations; additive owner breakdowns use one deterministic owner-set bucket per investment. Custom groups may overlap and serve as reporting-scope filters rather than additive composition segments. The exact rules are owned by [metrics](metrics.md#snapshot-scopes-and-additive-breakdowns).
 
 ### Portfolio or view
 
@@ -81,4 +81,4 @@ An investment can be active or closed. Closing stops ordinary forward data entry
 
 MVP financial values are USD with exact cent precision. Financial/economic dates are daily calendar dates, not timestamps. Operational metadata may use UTC timestamps but cannot supply or replace an economic effective date. Storage and adapter conventions are owned by [architecture](architecture.md#data-integrity).
 
-Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The application service accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Contribution, withdrawal, and transfer inputs are positive magnitudes; the selected action type owns direction. Gross value and linked debt inputs are nonnegative; derived net value can be negative. Valuation selection between dates and calculated/display rounding remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP.
+Persisted monetary columns use `numeric(18, 2)` (up to 16 whole digits). The application service accepts exact decimal strings with at most two fractional digits and rejects values that would require rounding. Contribution, withdrawal, and transfer inputs are positive magnitudes; the selected action type owns direction. Gross value and linked debt inputs are nonnegative; derived net value can be negative. Snapshot valuation selection uses the latest mark on or before the requested calendar date, preserves its actual date, and never interpolates or backfills from future marks. Missing coverage is explicit rather than zero. Exact-cent aggregation, period boundaries, and result states are owned by [metrics](metrics.md). Numerical-return tolerances and display rounding remain decisions for their implementing workflows. These decisions must not be implied by UI formatting. Multi-currency and foreign exchange are outside the MVP.

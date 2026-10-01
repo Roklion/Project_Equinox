@@ -3,12 +3,14 @@ import { asc, eq, sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createAnalyticsService } from "@/application/analytics";
+import { createPostgresAnalyticsRepository } from "@/persistence/analytics";
 import { createPortfolioService } from "@/application/portfolio";
 import { createDatabase } from "@/persistence/database";
 import { readDatabaseUrl } from "@/persistence/environment";
 import { migrateDatabase, migrationsFolder } from "@/persistence/migrate";
 import { createInvestment, closeInvestment, createPostgresPortfolioRepository, deleteValuationMark, editExternalAction, editTransfer, recordExternalAction, recordTransfer, recordValuationMark, saveValuationBatch } from "@/persistence/records";
-import { actions, assetClasses, households, institutions, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
+import { actions, assetClasses, customGroups, investmentGroups, households, institutions, investmentOwners, investments, movements, owners, valuationMarks } from "@/persistence/schema";
 
 // Vitest runs outside Next.js. Only the framework marker is stubbed, not pg/SQL.
 vi.mock("server-only", () => ({}));
@@ -335,5 +337,64 @@ describe("PostgreSQL persistence", () => {
     await service.deleteValuationMark(home.id, a.id, "2026-07-01");
     await expect(service.deleteValuationMark(home.id, a.id, "2026-07-01"))
       .rejects.toMatchObject({ code: "mark_not_found" });
+  });
+  it("reads household-scoped canonical analytics without association fan-out and recomputes corrected marks", async () => {
+    const { db } = connection!;
+    const [home, other] = await db.insert(households).values([
+      { name: "Analytics sample" }, { name: "Other analytics sample" },
+    ]).returning();
+    const [a, b, outsider] = await db.insert(owners).values([
+      { householdId: home.id, name: "Owner A" }, { householdId: home.id, name: "Owner B" },
+      { householdId: other.id, name: "Other owner" },
+    ]).returning();
+    const [assetClass] = await db.insert(assetClasses).values({ householdId: home.id, label: "Example class" }).returning();
+    const [g1, g2] = await db.insert(customGroups).values([
+      { householdId: home.id, label: "Group 1" }, { householdId: home.id, label: "Group 2" },
+    ]).returning();
+    const joint = await createInvestment(db, { householdId: home.id, name: "Joint example",
+      ownerIds: [b.id, a.id], assetClassId: assetClass.id });
+    const solo = await createInvestment(db, { householdId: home.id, name: "Solo example", ownerIds: [a.id] });
+    const missing = await createInvestment(db, { householdId: home.id, name: "Future-only example", ownerIds: [a.id] });
+    const foreign = await createInvestment(db, { householdId: other.id, name: "Other example", ownerIds: [outsider.id] });
+    await db.insert(investmentGroups).values([
+      { householdId: home.id, investmentId: joint.id, groupId: g1.id },
+      { householdId: home.id, investmentId: joint.id, groupId: g2.id },
+    ]);
+    const workflow = createPortfolioService(createPostgresPortfolioRepository(db));
+    await workflow.recordValuationMark({ householdId: home.id, investmentId: joint.id,
+      asOfDate: "2026-01-01", grossValue: "10.01", debt: "20.02" });
+    await workflow.recordValuationMark({ householdId: home.id, investmentId: solo.id,
+      asOfDate: "2026-01-02", grossValue: "30.03" });
+    await workflow.recordValuationMark({ householdId: home.id, investmentId: missing.id,
+      asOfDate: "2026-02-01", grossValue: "100" });
+    await workflow.recordValuationMark({ householdId: other.id, investmentId: foreign.id,
+      asOfDate: "2026-01-01", grossValue: "999" });
+    await workflow.closeInvestment(home.id, joint.id, "2026-01-03");
+    const repository = createPostgresAnalyticsRepository(db);
+    const sources = await repository.getSnapshotSources(home.id, "2026-01-02");
+    expect(sources.investments).toHaveLength(3);
+    expect(sources.marks).toHaveLength(2);
+    expect(sources.investments.find((item) => item.id === joint.id)).toMatchObject({
+      status: "closed", closedOn: "2026-01-03",
+      classifications: { assetClass: { id: assetClass.id, label: "Example class" }, accountType: null },
+    });
+    const service = createAnalyticsService(repository);
+    const incomplete = await service.snapshot(home.id, "2026-01-02");
+    expect(incomplete.totals).toEqual({ status: "incomplete", reason: "missing_valuation",
+      missingInvestmentIds: [missing.id] });
+    const selected = await service.snapshot(home.id, "2026-01-02", { investmentIds: [joint.id, solo.id] }, "ownerSet");
+    expect(selected.totals).toEqual({ status: "available",
+      value: { grossValueCents: 4004n, debtCents: 2002n, navCents: 2002n } });
+    expect(selected.breakdown?.flatMap((bucket) => bucket.investmentIds).sort()).toEqual([joint.id, solo.id].sort());
+    const groupScope = await service.snapshot(home.id, "2026-01-02", { customGroupIds: [g1.id, g2.id] });
+    expect(groupScope.coverage.selectedCount).toBe(1);
+    expect(groupScope.totals).toEqual({ status: "available",
+      value: { grossValueCents: 1001n, debtCents: 2002n, navCents: -1001n } });
+    await workflow.replaceValuationMark({ householdId: home.id, investmentId: joint.id,
+      asOfDate: "2026-01-01", grossValue: "25.02" });
+    expect((await service.snapshot(home.id, "2026-01-02", { investmentIds: [joint.id] })).totals)
+      .toEqual({ status: "available", value: { grossValueCents: 2502n, debtCents: 2002n, navCents: 500n } });
+    await workflow.deleteValuationMark(home.id, joint.id, "2026-01-01");
+    expect((await service.snapshot(home.id, "2026-01-02", { investmentIds: [joint.id] })).totals.status).toBe("incomplete");
   });
 });
