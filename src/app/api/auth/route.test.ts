@@ -1,3 +1,4 @@
+vi.mock("@/app/setup-data", () => ({ householdSetupService: () => ({ getState: async () => ({ status: "configured", householdId: "home" }) }) }));
 import { randomBytes, scryptSync } from "node:crypto";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

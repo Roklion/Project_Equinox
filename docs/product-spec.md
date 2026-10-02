@@ -54,3 +54,9 @@ An MVP is successful when a user can maintain dated values and cash flows with l
 The repository is public. All checked-in examples, fixtures, tests, and screenshots must contain generic investment names and synthetic figures. Real personal financial data and any content copied or derived from a user's private investment spreadsheet are prohibited from repository content.
 
 Local use of a private spreadsheet for a future migration or reconciliation workflow is permitted only when its contents and derived artifacts remain outside the repository.
+
+## First-run household setup
+
+The password-protected personal MVP exposes one household. On a clean migrated database, authenticated navigation goes to first-run setup, which creates a USD household with a display name and at least one initial owner. Household and owner identities are stable; creation commits atomically. Setup retries return the configured household without changing its names or adding owners, including after an uncertain response. Existing installations bypass setup. Multiple households produce an explicit configuration recovery state, never arbitrary selection. There is no ordinary household creation/switching or owner administration surface.
+
+After setup, Add investment is immediately available. Optional classifications may remain empty; no demo seed or lookup population is required. Authentication remains the single-password model.
