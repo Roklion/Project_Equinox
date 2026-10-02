@@ -43,6 +43,15 @@ test("browse and detail preserve value states, lifecycle and correction navigati
   await page.screenshot({ path: testInfo.outputPath("investments.png"), fullPage: true });
   await page.goto("/investments/" + funded + "?date=2026-02-01&start=2024-01-01");
   await expect(page.getByLabel("Period start")).toHaveValue("2024-01-01");
+  const trend = page.getByRole("region", { name: "Value over time" });
+  await expect(trend.locator("svg")).toBeVisible();
+  await expect(trend.getByLabel("Inspect recorded date")).toHaveValue("2026-01-01");
+  await page.getByLabel("Reporting date").fill("2025-12-31");
+  await page.getByRole("button", { name: "Update period" }).click();
+  await expect(page.getByRole("region", { name: "Value over time" }).getByText("No valuation observations in this range.")).toBeVisible();
+  await expect(page.getByLabel("Reporting date")).toHaveValue("2025-12-31");
+  await page.getByLabel("Reporting date").fill("2026-02-01");
+  await page.getByRole("button", { name: "Update period" }).click();
   await expect(page.getByText("1.21×", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Period performance" })).toBeVisible();
   await page.getByText("Ownership and classification", { exact: true }).click();

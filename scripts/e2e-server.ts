@@ -52,7 +52,7 @@ async function main() {
     } finally {
       await connection.pool.end();
     }
-    server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", "3100", "-H", "localhost"], {
+    server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-p", process.env.E2E_PORT ?? "3100", "-H", "localhost"], {
       stdio: "inherit",
       env: { ...process.env, NODE_ENV: "development", DATABASE_URL: databaseUrl.toString(), APP_PASSWORD_HASH: passwordHash,
         SESSION_SECRET: "31".repeat(32) },
