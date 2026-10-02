@@ -3,6 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import type { GroupingDimension, Snapshot } from "@/domain/analytics/snapshot";
 import { AsOfDate, ChartFrame, HeadlineValue, MetricValue } from "@/components/financial/primitives";
 import { formatDate, formatMoney } from "@/components/financial/format";
+import { compositionPlotSeries, type PlotSeries } from "./composition-series";
 import { HistoryPlot } from "./plot";
 import { compositionData, groupings, measures, trendData, visiblePoints,
   type CompositionSeries, type Measure, type Range, type ValueSeries } from "./model";
@@ -61,7 +62,7 @@ export function ValueTrendChart({ series, allowMeasureSwitch = false }: { series
   const [measure, setMeasure] = useState<Measure>("navCents");
   const id = useId();
   const points = useMemo(() => visiblePoints(series.points, series.endDate, range), [series, range]);
-  const lines = useMemo(() => [{ name: measures[measure], type: "line", step: "end", smooth: false,
+  const lines = useMemo<PlotSeries[]>(() => [{ name: measures[measure], type: "line", step: "end", smooth: false,
     connectNulls: false, symbolSize: 7, showSymbol: true, lineStyle: { width: 2 },
     areaStyle: { opacity: 0.06 }, data: trendData(points, measure) }], [points, measure]);
   return <Inspector points={points} endDate={series.endDate} title="Value over time" series={lines}
@@ -83,14 +84,7 @@ export function CompositionChart({ seriesByGrouping }: {
   const series = seriesByGrouping[group] ?? seriesByGrouping[supported[0]?.value];
   const points = useMemo(() => series ? visiblePoints(series.points, series.endDate, range) : [], [series, range]);
   const mapped = useMemo(() => compositionData(points, series?.points), [points, series]);
-  const lines = useMemo(() => mapped.segments.map((segment, index) => ({
-    name: segment.label, type: "line", step: "end", smooth: false, connectNulls: false,
-    stack: mapped.negative ? undefined : "nav", symbolSize: 5, showSymbol: true,
-    lineStyle: { width: mapped.negative ? 2.5 : 1.5 },
-    endLabel: { show: true, formatter: () => String(index + 1), distance: 4, color: "inherit" },
-    labelLayout: { moveOverlap: "shiftY" },
-    areaStyle: mapped.negative ? undefined : { opacity: 0.6 }, data: segment.data,
-  })), [mapped]);
+  const lines = useMemo(() => compositionPlotSeries(points, series?.points), [points, series]);
   if (!series) return <p>No composition series supplied.</p>;
   return <Inspector points={points} endDate={series.endDate} title="Composition over time" series={lines}
     summary={(point) => <HeadlineValue label="Total net investment value" asOfDate={point.asOfDate}
@@ -101,10 +95,11 @@ export function CompositionChart({ seriesByGrouping }: {
       </select></label></div>}
     onPoint={(point) => {
       const selected = points.find((item) => item.asOfDate === point.asOfDate)!;
-      return <>{mapped.negative && <p className="chart-coverage-note">Negative segments are present. Separate lines replace stacking for this range; exact values remain below.</p>}
+      return <>{mapped.negative && <p className="chart-coverage-note">Hatched areas subtract negative NAV from the stack. Solid areas add value. The dashed line shows total NAV; overlapping bands follow the numbered group order.</p>}
         <dl className="chart-segments">{mapped.segments.map((segment, index) => {
           const bucket = selected.breakdown.find((item) => item.key === segment.key);
           return <div key={segment.key}><dt><span className="chart-swatch" aria-hidden="true"
+            data-negative={bucket?.totals.status === "available" && bucket.totals.value.navCents < 0n || undefined}
             style={{ backgroundColor: "var(--chart-series-" + (index % 8 + 1) + ")" }} />{index + 1}. {segment.label}</dt>
             <dd>{bucket ? <MetricValue result={bucket.totals.status === "available"
               ? { status: "available", value: bucket.totals.value.navCents } : bucket.totals} format={formatMoney} />

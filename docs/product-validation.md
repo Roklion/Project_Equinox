@@ -22,7 +22,7 @@ The product journey distinguishes the four financial Add actions from investment
 
 Run npm run check, npm run test:db, npm run test:presentation, npm run test:e2e and git diff --check against the intended base. The existing CI browser job runs the same presentation and E2E commands; test:e2e includes test:bootstrap after the seeded regression suite. test:bootstrap starts and cleans up a separate migration-only database per viewport; it never seeds it or resets an existing application database.
 
-Inspect generated synthetic screenshots and traces when a failure concerns layout or interaction. The primary workflows must fit the viewport, keep dates visible, offer labeled controls with usable focus/touch targets, and expose essential chart information outside the plot. Composition switches to separate lines when negative segments prevent a meaningful additive stack.
+Inspect generated synthetic screenshots and traces when a failure concerns layout or interaction. The primary workflows must fit the viewport, keep dates visible, offer labeled controls with usable focus/touch targets, and expose essential chart information outside the plot. Composition retains a signed cumulative stack: negative bands use diagonal hatching and subtract from adjacent areas, while a dashed authoritative total-NAV line distinguishes the net total from overlapping bands.
 
 ## Proportionate UX checks
 

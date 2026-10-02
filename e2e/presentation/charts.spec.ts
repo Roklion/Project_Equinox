@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
   await page.setContent(readFileSync(".next/chart-fixture.html", "utf8"));
   await expect(page.getByTestId("complete").locator("svg").first()).toBeVisible();
 });
-test("authoritative values, grouping controls, negative fallback, sparse and incomplete states", async ({ page }, info) => {
+test("authoritative values, grouping controls, negative bands, sparse and incomplete states", async ({ page }, info) => {
   const complete = page.getByTestId("complete");
   const trend = complete.getByRole("region", { name: "Value over time" });
   await expect(trend.locator(".headline-number")).toHaveText("$607.80");
@@ -17,7 +17,7 @@ test("authoritative values, grouping controls, negative fallback, sparse and inc
   await expect(composition.locator(".chart-segments")).toContainText("Owner A + Owner B");
   expect(await composition.getByLabel("Group by").locator("option").allTextContents()).not.toContain("Custom group");
   await expect(page.getByTestId("negative").locator(".headline-number").first()).toHaveText("−$20.00");
-  await expect(page.getByTestId("negative")).toContainText("Separate lines replace stacking");
+  await expect(page.getByTestId("negative")).toContainText("Hatched areas subtract negative NAV");
   const partial = page.getByTestId("partial").getByRole("region", { name: "Value over time" });
   await partial.getByLabel("Inspect recorded date").selectOption("2026-01-01");
   await expect(partial).toContainText("Incomplete valuation coverage");
@@ -123,7 +123,16 @@ test("composition palette matches plotted areas/lines and remains stable across 
     const colors = await swatches.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
     expect(new Set(colors).size).toBe(colors.length);
     const strokes = await chart.locator("svg path").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).stroke));
-    for (const color of colors) expect(strokes).toContain(color);
+    const inks = await chart.evaluate((node) => Array.from({ length: node.querySelectorAll(".chart-swatch").length }, (_, index) =>
+      getComputedStyle(node).getPropertyValue("--chart-series-" + (index + 1) + "-ink").trim()));
+    for (const ink of inks) {
+      const rgb = ink.slice(1).match(/../g)!.map((value) => parseInt(value, 16));
+      expect(strokes).toContain("rgb(" + rgb.join(", ") + ")");
+    }
+    if (fixture === "negative") {
+      await expect(chart.locator("svg pattern").first()).toBeAttached();
+      await expect(chart.locator(".chart-swatch[data-negative]")).toHaveCount(1);
+    }
     if (fixture === "complete") {
       const fills = await chart.locator("svg path").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill));
       for (const color of colors) expect(fills).toContain(color);
@@ -133,4 +142,35 @@ test("composition palette matches plotted areas/lines and remains stable across 
     await chart.getByRole("button", { name: "All", exact: true }).click();
     await chart.screenshot({ path: info.outputPath(fixture + "-palette.png") });
   }
+});
+
+test("signed areas hatch only negative dates and retain the authoritative total", async ({ page }, info) => {
+  const chart = page.getByTestId("signed");
+  const dates = chart.getByLabel("Inspect recorded date");
+  await expect(chart.locator(".headline-number")).toHaveText("$250.00");
+  await expect(chart.locator(".chart-swatch[data-negative]")).toHaveCount(1);
+  await expect(chart.locator('svg path[fill^="url("]').first()).toBeVisible();
+  await dates.selectOption("2026-07-01");
+  await expect(chart.locator(".headline-number")).toHaveText("$320.00");
+  await expect(chart.locator(".chart-swatch[data-negative]")).toHaveCount(0);
+  await dates.selectOption("2026-01-01");
+  await expect(chart.locator(".headline-number")).toHaveText("$240.00");
+  await expect(chart.locator(".chart-segments")).toContainText("−$60.00");
+  await chart.screenshot({ path: info.outputPath("signed-bands.png") });
+});
+
+test("all numbered endpoints and chart strokes retain accessible contrast with bright fills", async ({ page }) => {
+  const chart = page.getByTestId("many");
+  await chart.scrollIntoViewIfNeeded();
+  const labels = chart.locator('svg text[text-anchor="start"]').filter({ hasText: /^[1-9]$/ });
+  await expect(labels).toHaveCount(9);
+  const labelColors = await labels.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill));
+  const contrast = (rgb: number[]) => {
+    const linear = rgb.map((value) => value / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 1.05 / (linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722 + 0.05);
+  };
+  for (const color of labelColors) expect(contrast(color.match(/[\d.]+/g)!.map(Number))).toBeGreaterThanOrEqual(4.5);
+  const inkColors = await chart.evaluate((node) => Array.from({ length: 8 }, (_, index) =>
+    getComputedStyle(node).getPropertyValue("--chart-series-" + (index + 1) + "-ink").trim()));
+  for (const color of inkColors) expect(contrast(color.slice(1).match(/../g)!.map((part) => parseInt(part, 16)))).toBeGreaterThanOrEqual(4.5);
 });

@@ -1,17 +1,18 @@
 "use client";
 import { useEffect, useRef, type PointerEvent } from "react";
-import { init, use as register, type EChartsCoreOption } from "echarts/core";
+import { init, use as register } from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent } from "echarts/components";
 import { LabelLayout } from "echarts/features";
 import { SVGRenderer } from "echarts/renderers";
 import type { Snapshot } from "@/domain/analytics/snapshot";
+import type { PlotSeries } from "./composition-series";
 import { nearestPoint, selectedFraction, timestamp } from "./model";
 register([LineChart, GridComponent, SVGRenderer, LabelLayout]);
 
 export function HistoryPlot({ points, selected, onSelect, series }: {
   points: readonly Snapshot[]; selected: number; onSelect: (index: number) => void;
-  series: EChartsCoreOption["series"];
+  series: readonly PlotSeries[];
 }) {
   const host = useRef<HTMLDivElement>(null);
   const gesture = useRef<{ x: number; y: number; horizontal: boolean } | null>(null);
@@ -22,7 +23,7 @@ export function HistoryPlot({ points, selected, onSelect, series }: {
     const first = timestamp(points[0].asOfDate), last = timestamp(points.at(-1)!.asOfDate);
     chart.setOption({
       animation: false, useUTC: true,
-      color: Array.from({ length: 8 }, (_, i) => colors.getPropertyValue("--chart-series-" + (i + 1)).trim()),
+      color: Array.from({ length: 8 }, (_, i) => colors.getPropertyValue("--chart-series-" + (i + 1) + "-ink").trim()),
       grid: { left: 56, right: 16, top: 16, bottom: 40 },
       xAxis: { type: "time", min: first === last ? first - 86400000 : first,
         max: first === last ? last + 86400000 : last, splitNumber: 3,
@@ -31,7 +32,14 @@ export function HistoryPlot({ points, selected, onSelect, series }: {
       yAxis: { type: "value", axisLabel: { color: colors.getPropertyValue("--color-muted"),
         formatter: (value: number) => new Intl.NumberFormat("en-US", { notation: "compact", style: "currency", currency: "USD", maximumFractionDigits: 1 }).format(value) },
         splitLine: { lineStyle: { color: colors.getPropertyValue("--color-border") } } },
-      series,
+      series: series.map(({ paletteIndex, totalNav, ...option }) => {
+        if (paletteIndex === undefined && !totalNav) return option;
+        const color = colors.getPropertyValue(totalNav ? "--color-text" : "--chart-series-" + (paletteIndex! % 8 + 1)).trim();
+        const ink = totalNav ? color : colors.getPropertyValue("--chart-series-" + (paletteIndex! % 8 + 1) + "-ink").trim();
+        return { ...option, itemStyle: { ...option.itemStyle, color: ink }, lineStyle: { ...option.lineStyle, color: ink },
+          ...(option.endLabel ? { endLabel: { ...option.endLabel, color: ink } } : {}),
+          ...(option.areaStyle ? { areaStyle: { ...option.areaStyle, color } } : {}) };
+      }),
     });
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(host.current);
