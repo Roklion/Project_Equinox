@@ -9,6 +9,7 @@ EPIC 4's final integration pass protects the personal household product on Deskt
 | Clean migrations, authentication, zero-household routing, owner validation, multi-owner setup, lost-response retry, immediate unclassified investment, configured setup bypass | e2e/bootstrap.spec.ts, run separately against a fresh database for each viewport |
 | Overview -> Investments -> detail -> management -> contribution -> Update Center -> single valuation -> chart inspection -> closure -> retained history | e2e/product-regression.spec.ts |
 | Create/edit classification and ownership, close-date conflicts, historical accessibility, investment identity/history preservation | e2e/investment-management.spec.ts |
+| Investment detail -> all four Add actions, date/source defaults, saved return context, global Add reset, invalid/closed defaults | e2e/action-context.spec.ts |
 | Active/closed filters, metadata filters, missing valuations and unavailable detail | e2e/investments.spec.ts |
 | Missing/stale/current valuation priority, closed-history exclusion, single/batch updates and fresh client-navigation returns | e2e/overview-updates.spec.ts |
 | Real persisted chart values, dates, additive owner grouping and browser-local reporting dates | e2e/historical-charts.spec.ts |

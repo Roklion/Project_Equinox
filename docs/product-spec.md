@@ -20,7 +20,7 @@ An **investment** is the leaf-level economic account or holding whose cash flows
 ## Core workflows
 
 - Add and maintain an investment and its classification metadata.
-- Record a contribution, withdrawal or distribution, transfer, or dated valuation mark.
+- Record a contribution, withdrawal or distribution, transfer, or dated valuation mark. Investment-detail launches preserve the investment and reporting date through Add; transfers default it as the source. Successful saves offer return to the originating dated detail. Global Add starts without an investment default. See [input workflows](design-system.md#input-workflows).
 - Enter valuation marks efficiently for several investments in a batch.
 - Review current gross value, investment-linked debt, and net investment value.
 - Explore value and performance over time at investment, group, portfolio, and household levels.
