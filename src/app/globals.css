@@ -263,13 +263,13 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
 }
 :root {
   --chart-series-1: #315d49;
-  --chart-series-2: #65768c;
-  --chart-series-3: #8a715b;
-  --chart-series-4: #786783;
-  --chart-series-5: #4e8080;
-  --chart-series-6: #7e804c;
-  --chart-series-7: #9b6270;
-  --chart-series-8: #63756a;
+  --chart-series-2: #b06432;
+  --chart-series-3: #416fa6;
+  --chart-series-4: #8d7620;
+  --chart-series-5: #74579c;
+  --chart-series-6: #287f88;
+  --chart-series-7: #aa4c70;
+  --chart-series-8: #596675;
 }
 .chart-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); margin-block: var(--space-2); }
 .chart-ranges { display: flex; gap: 0.25rem; }

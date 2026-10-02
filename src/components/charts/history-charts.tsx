@@ -86,10 +86,10 @@ export function CompositionChart({ seriesByGrouping }: {
   const lines = useMemo(() => mapped.segments.map((segment, index) => ({
     name: segment.label, type: "line", step: "end", smooth: false, connectNulls: false,
     stack: mapped.negative ? undefined : "nav", symbolSize: 5, showSymbol: true,
-    lineStyle: { width: mapped.negative ? 2 : 1 },
+    lineStyle: { width: mapped.negative ? 2.5 : 1.5 },
     endLabel: { show: true, formatter: () => String(index + 1), distance: 4, color: "inherit" },
     labelLayout: { moveOverlap: "shiftY" },
-    areaStyle: mapped.negative ? undefined : { opacity: 0.55 }, data: segment.data,
+    areaStyle: mapped.negative ? undefined : { opacity: 0.6 }, data: segment.data,
   })), [mapped]);
   if (!series) return <p>No composition series supplied.</p>;
   return <Inspector points={points} endDate={series.endDate} title="Composition over time" series={lines}
