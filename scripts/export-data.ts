@@ -1,6 +1,6 @@
 import nextEnv from "@next/env";
-import { open, readFile, unlink } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { open, readFile, realpath, unlink } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { createExportService } from "../src/application/export";
 import { validateExportBundle } from "../src/domain/portability/bundle";
 import { createDatabase } from "../src/persistence/database";
@@ -19,9 +19,10 @@ async function main() {
   }
   if (command !== "export" || !first || !second || extra.length) throw new Error("Invalid arguments.");
   if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(first)) throw new Error("Invalid household.");
-  const destination = resolve(second);
+  const requestedDestination = resolve(second);
+  const destination = join(await realpath(dirname(requestedDestination)), basename(requestedDestination));
   // Private artifacts must remain outside this public checkout, even if ignored.
-  const within = relative(process.cwd(), destination);
+  const within = relative(await realpath(process.cwd()), destination);
   if (!isAbsolute(within) && within !== ".." && !within.startsWith("..\\") && !within.startsWith("../")) throw new Error("Private destination required.");
   const { db, pool } = createDatabase(readDatabaseUrl());
   try {

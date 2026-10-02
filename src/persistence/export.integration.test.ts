@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
@@ -52,6 +52,13 @@ it("runs the private CLI, validates offline, and refuses overwrite/checkout dest
     expect(await readFile(destination, "utf8")).toBe(contents);
     await expect(run(["export", home.id, "synthetic-must-not-be-written.json"])).rejects.toThrow();
     await expect(readFile("synthetic-must-not-be-written.json")).rejects.toThrow();
+    // A private-looking parent can be a directory link into the public checkout.
+    const linkedParent = join(directory, "checkout-link");
+    await symlink(process.cwd(), linkedParent, process.platform === "win32" ? "junction" : "dir");
+    const linkedDestination = join(linkedParent, "synthetic-link-must-not-be-written.json");
+    await expect(run(["export", home.id, linkedDestination])).rejects.toThrow();
+    await expect(readFile("synthetic-link-must-not-be-written.json")).rejects.toThrow();
+    await rm(linkedParent);
     const absent = join(directory, "absent-household.json");
     await expect(run(["export", randomUUID(), absent])).rejects.toThrow();
     await expect(readFile(absent)).rejects.toThrow();
