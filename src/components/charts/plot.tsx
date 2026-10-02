@@ -23,7 +23,7 @@ export function HistoryPlot({ points, selected, onSelect, series }: {
     const first = timestamp(points[0].asOfDate), last = timestamp(points.at(-1)!.asOfDate);
     chart.setOption({
       animation: false, useUTC: true,
-      color: Array.from({ length: 8 }, (_, i) => colors.getPropertyValue("--chart-series-" + (i + 1)).trim()),
+      color: Array.from({ length: 8 }, (_, i) => colors.getPropertyValue("--chart-series-" + (i + 1) + "-ink").trim()),
       grid: { left: 56, right: 16, top: 16, bottom: 40 },
       xAxis: { type: "time", min: first === last ? first - 86400000 : first,
         max: first === last ? last + 86400000 : last, splitNumber: 3,
@@ -35,7 +35,9 @@ export function HistoryPlot({ points, selected, onSelect, series }: {
       series: series.map(({ paletteIndex, totalNav, ...option }) => {
         if (paletteIndex === undefined && !totalNav) return option;
         const color = colors.getPropertyValue(totalNav ? "--color-text" : "--chart-series-" + (paletteIndex! % 8 + 1)).trim();
-        return { ...option, itemStyle: { ...option.itemStyle, color }, lineStyle: { ...option.lineStyle, color },
+        const ink = totalNav ? color : colors.getPropertyValue("--chart-series-" + (paletteIndex! % 8 + 1) + "-ink").trim();
+        return { ...option, itemStyle: { ...option.itemStyle, color: ink }, lineStyle: { ...option.lineStyle, color: ink },
+          ...(option.endLabel ? { endLabel: { ...option.endLabel, color: ink } } : {}),
           ...(option.areaStyle ? { areaStyle: { ...option.areaStyle, color } } : {}) };
       }),
     });

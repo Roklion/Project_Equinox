@@ -123,7 +123,12 @@ test("composition palette matches plotted areas/lines and remains stable across 
     const colors = await swatches.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
     expect(new Set(colors).size).toBe(colors.length);
     const strokes = await chart.locator("svg path").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).stroke));
-    for (const color of colors) expect(strokes).toContain(color);
+    const inks = await chart.evaluate((node) => Array.from({ length: node.querySelectorAll(".chart-swatch").length }, (_, index) =>
+      getComputedStyle(node).getPropertyValue("--chart-series-" + (index + 1) + "-ink").trim()));
+    for (const ink of inks) {
+      const rgb = ink.slice(1).match(/../g)!.map((value) => parseInt(value, 16));
+      expect(strokes).toContain("rgb(" + rgb.join(", ") + ")");
+    }
     if (fixture === "negative") {
       await expect(chart.locator("svg pattern").first()).toBeAttached();
       await expect(chart.locator(".chart-swatch[data-negative]")).toHaveCount(1);
@@ -152,4 +157,20 @@ test("signed areas hatch only negative dates and retain the authoritative total"
   await expect(chart.locator(".headline-number")).toHaveText("$240.00");
   await expect(chart.locator(".chart-segments")).toContainText("−$60.00");
   await chart.screenshot({ path: info.outputPath("signed-bands.png") });
+});
+
+test("all numbered endpoints and chart strokes retain accessible contrast with bright fills", async ({ page }) => {
+  const chart = page.getByTestId("many");
+  await chart.scrollIntoViewIfNeeded();
+  const labels = chart.locator('svg text[text-anchor="start"]').filter({ hasText: /^[1-9]$/ });
+  await expect(labels).toHaveCount(9);
+  const labelColors = await labels.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill));
+  const contrast = (rgb: number[]) => {
+    const linear = rgb.map((value) => value / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 1.05 / (linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722 + 0.05);
+  };
+  for (const color of labelColors) expect(contrast(color.match(/[\d.]+/g)!.map(Number))).toBeGreaterThanOrEqual(4.5);
+  const inkColors = await chart.evaluate((node) => Array.from({ length: 8 }, (_, index) =>
+    getComputedStyle(node).getPropertyValue("--chart-series-" + (index + 1) + "-ink").trim()));
+  for (const color of inkColors) expect(contrast(color.slice(1).match(/../g)!.map((part) => parseInt(part, 16)))).toBeGreaterThanOrEqual(4.5);
 });

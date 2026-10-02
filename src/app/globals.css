@@ -270,6 +270,14 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
   --chart-series-6: #32b9c3;
   --chart-series-7: #ec79a4;
   --chart-series-8: #8195d6;
+  --chart-series-1-ink: #087653;
+  --chart-series-2-ink: #a74b11;
+  --chart-series-3-ink: #2263a5;
+  --chart-series-4-ink: #826007;
+  --chart-series-5-ink: #7145ad;
+  --chart-series-6-ink: #15717a;
+  --chart-series-7-ink: #a93b68;
+  --chart-series-8-ink: #5364a2;
 }
 .chart-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); margin-block: var(--space-2); }
 .chart-ranges { display: flex; gap: 0.25rem; }
