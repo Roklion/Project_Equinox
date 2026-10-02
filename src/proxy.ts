@@ -1,3 +1,4 @@
+import { householdSetupService } from "@/app/setup-data";
 import { NextRequest, NextResponse } from "next/server";
 import { hasValidSession, isValidSessionSecret, SESSION_COOKIE, sessionCookieOptions } from "@/auth/session";
 import { isSessionActive } from "@/auth/store";
@@ -31,7 +32,17 @@ export async function proxy(request: NextRequest) {
       console.error("Session validation failed due to a database error.");
     }
   }
-  if (valid) return NextResponse.next();
+  if (valid) {
+    if (!path.startsWith("/api/") && path !== "/setup") {
+      try {
+        const state = await householdSetupService().getState();
+        if (state.status !== "configured") return NextResponse.redirect(new URL("/setup", request.url));
+      } catch {
+        return NextResponse.redirect(new URL("/setup", request.url));
+      }
+    }
+    return NextResponse.next();
+  }
 
   const response = path.startsWith("/api/")
     ? new NextResponse(null, { status: 401 })
