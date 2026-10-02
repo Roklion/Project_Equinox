@@ -261,6 +261,37 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
   .entry-actions .primary-button { width: 100%; }
   .entry-actions a { text-align: center; min-height: 44px; display: grid; place-items: center; }
 }
+:root {
+  --chart-series-1: #315d49;
+  --chart-series-2: #65768c;
+  --chart-series-3: #8a715b;
+  --chart-series-4: #786783;
+  --chart-series-5: #4e8080;
+  --chart-series-6: #7e804c;
+  --chart-series-7: #9b6270;
+  --chart-series-8: #63756a;
+}
+.chart-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); margin-block: var(--space-2); }
+.chart-ranges { display: flex; gap: 0.25rem; }
+.chart-ranges button, .chart-controls select, .chart-date-control select { min-height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-small); padding: 0.5rem 0.75rem; background: var(--color-surface); color: var(--color-text); font: inherit; max-width: 100%; }
+.chart-controls label, .chart-date-control { display: grid; gap: 0.35rem; font-size: 0.875rem; min-width: 0; }
+.chart-ranges button { cursor: pointer; }
+.chart-ranges button[aria-pressed="true"] { background: var(--color-accent); color: white; }
+.chart-controls :focus-visible, .chart-date-control :focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+.history-plot { position: relative; height: 280px; touch-action: pan-y; }
+.history-renderer { height: 100%; width: 100%; pointer-events: none; }
+.history-crosshair { position: absolute; top: 16px; bottom: 40px; border-left: 1px dashed var(--color-accent); pointer-events: none; }
+.chart-date-control { max-width: 22rem; }
+.chart-coverage-note { color: var(--color-muted); font-size: 0.875rem; border-left: 3px solid var(--color-accent); padding-left: var(--space-2); }
+.chart-segments { display: grid; gap: var(--space-1); padding-block: var(--space-2); }
+.chart-segments > div { display: flex; justify-content: space-between; gap: var(--space-2); }
+.chart-segments dt { overflow-wrap: anywhere; }
+.chart-segments dd { margin: 0; text-align: right; }
+.chart-swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; margin-right: 0.5rem; }
+@media (max-width: 40rem) {
+  .chart-frame { padding: var(--space-2); }
+  .chart-segments > div { flex-wrap: wrap; }
+}
 .investment-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; padding-block: var(--space-3); }
 .investment-filters .entry-actions { grid-column: 1 / -1; }
 .investment-filter-details { grid-column: 1 / -1; }

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { loadHistoricalCharts } from "@/app/chart-data";
 import { notFound } from "next/navigation";
 import { withAnalyticsService } from "@/app/add/entry-data";
 import { reportingDate } from "@/components/financial/investment-browse";
-import { AsOfDate, ChartFrame, HeadlineValue, MetadataRows, MetricValue, PerformanceBreakdown, ReturnMetric, SurfaceState, ValuationAge, ValueBreakdown } from "@/components/financial/primitives";
+import { HeadlineValue, MetadataRows, MetricValue, PerformanceBreakdown, ReturnMetric, SurfaceState, ValuationAge, ValueBreakdown } from "@/components/financial/primitives";
 import { formatDate, formatMoney } from "@/components/financial/format";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +16,7 @@ export default async function InvestmentDetailPage({ params, searchParams }: {
   const query = await searchParams;
   let context;
   try {
-    const date = reportingDate(query.date);
+    const date = reportingDate(query.date ?? (await cookies()).get("equinox-chart-date")?.value);
     const start = query.start || date.slice(0, 4) + "-01-01";
     context = await withAnalyticsService(async ({ householdId, analytics }) => {
       const scope = { investmentIds: [investmentId] };
@@ -33,6 +35,7 @@ export default async function InvestmentDetailPage({ params, searchParams }: {
   const date = returns.asOfDate;
   const nav = valuation.status === "available" ? { status: "available" as const, value: valuation.value.navCents } : valuation;
   const delta = period.change.status === "available" ? { status: "available" as const, value: period.change.value.navChangeCents } : period.change;
+  const charts = await loadHistoricalCharts({ investmentIds: [investment.id] }, query.date ? date : undefined);
   const historyHref = "/investments/history?investmentId=" + encodeURIComponent(investment.id);
   return <><div className="entry-topline"><Link href={"/investments?date=" + date + (investment.status === "closed" ? "&lifecycle=all" : "")}>← Investments</Link></div>
     <section className="page-heading"><p className="eyebrow">Investment detail</p><h1>{investment.name}</h1>
@@ -49,10 +52,8 @@ export default async function InvestmentDetailPage({ params, searchParams }: {
       <button className="primary-button" type="submit">Update period</button>
     </form>
     <div className="investment-detail-layout"><div>
-      <ChartFrame title="Value history" summary={<><MetricValue result={nav} format={formatMoney} /><AsOfDate date={date} /></>}>
-        <p className="metric-context">Interactive value charts are coming with the value-trend update. Dated valuation observations remain available in history.</p>
-        <Link href={historyHref}>View history and corrections</Link>
-      </ChartFrame>
+      {charts}
+      <Link href={historyHref}>View history and corrections</Link>
       <section className="metadata-section"><h2>Value and linked debt</h2><ValueBreakdown result={returns.snapshot.totals} asOfDate={date} /></section>
       <section className="metadata-section"><h2>Period performance</h2>
         <PerformanceBreakdown result={period.change} startDate={period.startDate} endDate={date} />

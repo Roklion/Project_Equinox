@@ -31,13 +31,13 @@ test("Overview and Update Center integrate maintenance and fresh single/batch sa
   } })).status()).toBe(200);
   await page.goto("/?date=2026-10-01&range=1y");
   await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
-  await expect(page.locator(".headline-number").getByText(/Valuation coverage is incomplete/)).toBeVisible();
+  await expect(page.locator(".page-heading .headline-number").getByText(/Valuation coverage is incomplete/)).toBeVisible();
   await page.getByText("Actual valuation dates and coverage", { exact: true }).click();
   await expect(page.getByText("Missing qualifying valuation").first()).toBeVisible();
-  await expect(page.getByRole("region", { name: "Value history" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Investment composition" })).toBeVisible();
-  const headline = (await page.locator(".headline-value").boundingBox())!;
-  const chart = (await page.getByRole("region", { name: "Value history" }).boundingBox())!;
+  await expect(page.getByRole("region", { name: "Value over time" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Composition over time" })).toBeVisible();
+  const headline = (await page.locator(".page-heading .headline-value").boundingBox())!;
+  const chart = (await page.getByRole("region", { name: "Value over time" }).boundingBox())!;
   const performance = (await page.locator(".overview-period").boundingBox())!;
   expect(headline.y).toBeLessThan(chart.y);
   if (testInfo.project.name === "iphone") expect(chart.y).toBeLessThan(performance.y);
@@ -55,6 +55,7 @@ test("Overview and Update Center integrate maintenance and fresh single/batch sa
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   expect((await row("missing").getByRole("link", { name: "Update valuation", exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: testInfo.outputPath("update-center.png"), fullPage: true });
+  const documentTimeOrigin = await page.evaluate(() => window.performance.timeOrigin);
   await row("missing").getByRole("link", { name: "Update valuation", exact: true }).click();
   await expect(page.getByLabel("Investment", { exact: true })).toHaveValue(missing);
   await expect(page.getByLabel("As-of date", { exact: true })).toHaveValue("2026-10-01");
@@ -80,6 +81,7 @@ test("Overview and Update Center integrate maintenance and fresh single/batch sa
   await page.getByRole("link", { name: "Return to Update Center", exact: true }).click();
   await expect(row("stale").getByText("Recent valuation", { exact: true })).toBeVisible();
   await expect(row("stale").getByText("$215.00", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.performance.timeOrigin)).toBe(documentTimeOrigin);
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Add entry" }).click();
   await expect(page.locator(".action-grid .action-choice")).toHaveCount(4);
   await expect(page.getByRole("link", { name: /Contribution/ })).toBeVisible();
@@ -94,7 +96,7 @@ test("reporting today follows the browser calendar and range controls preserve i
   await page.clock.install({ time: new Date("2026-10-01T23:30:00Z") });
   await signIn(page);
   await expect(page.getByLabel("Reporting date", { exact: true })).toHaveValue("2026-10-02");
-  await page.getByLabel("Time range").selectOption("3m");
+  await page.getByLabel("Performance period", { exact: true }).selectOption("3m");
   await page.getByRole("button", { name: "Update overview", exact: true }).click();
   await expect(page.getByLabel("Reporting date", { exact: true })).toHaveValue("2026-10-02");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Update Center", exact: true }).click();

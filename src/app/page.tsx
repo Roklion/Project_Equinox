@@ -15,11 +15,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     const date = optionalDate(query.date)!;
     const start = periodStart(date, range);
     data = await withAnalyticsService(async ({ householdId, analytics }) => {
-      const [returns, period, snapshot, series] = await Promise.all([
+      const [returns, period, snapshot, history] = await Promise.all([
         analytics.returns(householdId, date), analytics.period(householdId, start, date),
-        analytics.snapshot(householdId, date, {}, "assetClass"), analytics.valueSeries(householdId, start, date),
+        analytics.snapshot(householdId, date, {}, "assetClass"), analytics.historicalSeries(householdId, "0100-01-01", date),
       ]);
-      return { returns, period, snapshot, series };
+      return { returns, period, snapshot, history };
     });
   } catch {
     return <><h1>Overview</h1><SurfaceState kind="error" title="Overview could not be loaded" action={<Link href="/">Try again</Link>}>

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { createAnalyticsService } from "@/application/analytics";
+import { ValueTrendChart, CompositionChart } from "@/components/charts/history-charts";
 import { InvestmentRow } from "@/components/financial/investment-row";
-import { AsOfDate, ChartFrame, HeadlineValue, MetricValue, PerformanceBreakdown, ReturnMetric, SurfaceState, ValuationAge, ValueBreakdown } from "@/components/financial/primitives";
+import { HeadlineValue, MetricValue, PerformanceBreakdown, ReturnMetric, ValuationAge, ValueBreakdown } from "@/components/financial/primitives";
 import { formatDate, formatMoney } from "@/components/financial/format";
 import { overviewRanges, type OverviewRange } from "@/components/financial/reporting-context";
 
@@ -10,10 +11,10 @@ export type OverviewData = {
   returns: Awaited<ReturnType<Analytics["returns"]>>;
   period: Awaited<ReturnType<Analytics["period"]>>;
   snapshot: Awaited<ReturnType<Analytics["snapshot"]>>;
-  series: Awaited<ReturnType<Analytics["valueSeries"]>>;
+  history: Awaited<ReturnType<Analytics["historicalSeries"]>>;
 };
 export function Overview({ data, range }: { data: OverviewData; range: OverviewRange }) {
-  const { returns, period, snapshot, series } = data;
+  const { returns, period, snapshot, history } = data;
   const date = snapshot.asOfDate;
   const nav = snapshot.totals.status === "available" ? { status: "available" as const, value: snapshot.totals.value.navCents } : snapshot.totals;
   const delta = period.change.status === "available" ? { status: "available" as const, value: period.change.value.navChangeCents } : period.change;
@@ -39,10 +40,11 @@ export function Overview({ data, range }: { data: OverviewData; range: OverviewR
     </section>
     <form className="investment-filters entry-form" action="/">
       <div className="entry-field"><label htmlFor="overview-date">Reporting date</label><input id="overview-date" name="date" type="date" defaultValue={date} required /></div>
-      <div className="entry-field"><label htmlFor="overview-range">Time range</label><select id="overview-range" name="range" defaultValue={range}>
+      <div className="entry-field"><label htmlFor="overview-range">Performance period</label><select id="overview-range" name="range" defaultValue={range}>
         {Object.entries(overviewRanges).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </select></div><button className="primary-button" type="submit">Update overview</button>
     </form>
+    <p className="metric-context">Performance period sets the summary; each chart has its own history range.</p>
     <section className="metadata-section overview-period" aria-labelledby="period-heading"><h2 id="period-heading">Cash flow and investment performance</h2>
       <PerformanceBreakdown result={period.change} startDate={period.startDate} endDate={date} />
       <dl className="financial-breakdown">
@@ -53,25 +55,17 @@ export function Overview({ data, range }: { data: OverviewData; range: OverviewR
       {period.change.status !== "available" && <p className="metric-context">Beginning or ending valuation coverage is incomplete. Recorded cash flows remain available; period performance cannot be calculated.</p>}
       <p className="metric-context">Transfers between tracked investments cancel at this household boundary. Valuation observations are not cash flows.</p>
     </section>
-    <ChartFrame title="Value history" summary={<><MetricValue result={nav} format={formatMoney} /><AsOfDate date={date} /></>}>
-      <p className="metric-context">Recorded household snapshots for the selected range. Interactive trend inspection will integrate with the dedicated chart update.</p>
-      {!series.points.length ? <SurfaceState kind="empty" title="No valuation observations in this range">Try a wider range or record a valuation.</SurfaceState>
-        : <><p className="metric-context">{series.points.length === 1 ? "One recorded observation; there is no trend to connect yet." : series.points.length + " recorded observations. Values are not interpolated."}</p>
-          <details className="investment-disclosure"><summary>Recorded date and value summaries</summary><dl className="financial-breakdown">
-            {series.points.map((point) => <div key={point.asOfDate}><dt><time dateTime={point.asOfDate}>{formatDate(point.asOfDate)}</time>
-              <span className="metric-context"> · {point.coverage.valuedCount}/{point.coverage.selectedCount} valued</span></dt><dd>
-              <MetricValue result={point.totals.status === "available" ? { status: "available", value: point.totals.value.navCents } : point.totals} format={formatMoney} />
-            </dd></div>)}</dl></details></>}
-      <Link href="/investments/history">Open valuation history and corrections</Link>
-    </ChartFrame>
-    <ChartFrame title="Investment composition" summary={<AsOfDate date={date} />}>
-      <p className="metric-context">Current NAV by asset class. Interactive composition over time will integrate with the dedicated chart update.</p>
+
+    <ValueTrendChart series={history.valueSeries} allowMeasureSwitch />
+    <CompositionChart seriesByGrouping={history.compositionSeries} />
+    <details className="metadata-section investment-disclosure"><summary>Current composition by asset class</summary>
+      <p className="metric-context">Reporting date {formatDate(date)} · Current classification associations apply to all history.</p>
       <dl className="financial-breakdown">{snapshot.breakdown?.map((bucket) => <div key={bucket.key}><dt>{bucket.label} · USD
         <span className="metric-context"> · {bucket.coverage.valuedCount}/{bucket.coverage.selectedCount} valued</span></dt><dd>
         <MetricValue result={bucket.totals.status === "available" ? { status: "available", value: bucket.totals.value.navCents } : bucket.totals} format={formatMoney} />
       </dd></div>)}</dl>
       {snapshot.totals.status !== "available" && <p className="metric-context">Available categories are not a complete portfolio total. No allocation percentages are shown.</p>}
-    </ChartFrame>
+    </details>
     <div className="overview-supporting">
       <section className="metadata-section"><h2>Value and linked debt</h2><ValueBreakdown result={snapshot.totals} asOfDate={date} /></section>
       <section className="metadata-section"><h2>Capital and returns since inception</h2>

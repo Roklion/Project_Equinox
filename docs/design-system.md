@@ -57,7 +57,7 @@ The shell uses a light neutral canvas, white surfaces, dark green text and accen
 
 One primary navigation exposes **Overview** (`/`), **Investments** (`/investments`), **Update Center** (`/updates`), and the existing **Add entry** launcher (`/add`). Desktop presents these horizontally; below 40rem they form a two-column touch-friendly grid. The same links remain available without hover or a sidebar. The current destination is underlined and uses `aria-current`; investment detail and history belong to Investments, batch valuation belongs to Update Center, and entry forms belong to Add. Sign out is a quiet secondary control available throughout the authenticated shell. Sign-in shows neither product navigation nor sign out. Shell edge padding retains installed-PWA safe areas; all navigation and sign-out targets are at least 48px tall.
 
-The Investments foundation lists canonical active and closed records and links to `/investments/[investmentId]`, which shows classification metadata and opens the existing history workflow with that investment selected. Overview and Update Center consume live household analytics and link into existing financial workflows. Interactive charts remain owned by the dedicated EPIC 4 chart tickets; Overview reserves separate trend and composition frames with actual recorded-date summaries and an authoritative current asset-class breakdown until that integration lands. Investment creation remains separate from the financial Add launcher.
+The Investments foundation lists canonical active and closed records and links to `/investments/[investmentId]`, which shows classification metadata and opens the existing history workflow with that investment selected. Overview and Update Center consume live household analytics and link into existing financial workflows. Overview integrates the reusable value-trend and composition charts from #49/#50, alongside an authoritative current asset-class breakdown. Investment creation remains separate from the financial Add launcher.
 
 `src/components/financial` owns headline values, signed deltas, as-of dates, gross/debt/NAV and cash-flow/performance/P&L breakdowns, MOIC/XIRR, unavailable explanations, valuation age, classification chips, metadata rows, investment rows, surface states, and chart frames. These compose authoritative `MetricResult`, snapshot, and period-change outputs; no financial formulas are calculated in these components. The same exact-money formatter serves existing entry, batch, and history workflows.
 
@@ -69,17 +69,17 @@ For financial output surfaces, use Monarch Money as a consumer-finance hierarchy
 
 Reusable value, delta, date, investment-row, and history components should compose with both the total-value trend and the stacked composition-over-time chart. The trend explains how much value changed; composition explains what makes up that value. Keep their visual roles distinct.
 
-## Charts
+## Investments browse and detail
 
-### Investments browse and detail
+Investments defaults to active records, with explicit closed-only and combined views. Rows show authoritative NAV, reporting date, effective mark date/age, lifecycle and selected asset-class/institution context. Missing marks remain unavailable. Filters use stable asset-class, institution, owner and custom-group IDs; overlapping groups filter rather than create additive segments. Ordering is display name then stable identity. The default browse view waits for the browser-local date before showing financial rows and dated detail links, and synchronizes that date on later default visits. An explicitly selected reporting date bypasses local-today synchronization and remains shown.
 
-Investments defaults to active records, with explicit closed-only and combined views. Rows show authoritative NAV, reporting date, effective mark date/age, lifecycle and selected asset-class/institution context. Missing marks remain unavailable. Filters use stable asset-class, institution, owner and custom-group IDs; overlapping groups filter rather than create additive segments. Ordering is display name then stable identity. The editable reporting date initially uses today's UTC calendar date, always shown explicitly.
-
-Investment detail leads with NAV, selected-period change, reporting date and mark age, followed by financial Add and Manage entry points. Closed records show the close date and historical correction access without ordinary Add. The default performance period is year to date, with editable start/end dates; since-inception P&L and returns are labeled separately. Both use authoritative investment-boundary analytics, including crossing transfer flows. Detail composes the shared chart frame, value/debt breakdown, cash-flow/performance and returns components. Interactive trend rendering belongs to the separate chart ticket; the frame links to actual dated valuation history while awaiting integration.
+Investment detail leads with NAV, selected-period change, reporting date and mark age, followed by financial Add and Manage entry points. Closed records show the close date and historical correction access without ordinary Add. The default performance period is year to date, with editable start/end dates; since-inception P&L and returns are labeled separately. Both use authoritative investment-boundary analytics, including crossing transfer flows. Detail composes the shared chart frame, value/debt breakdown, cash-flow/performance and returns components. Detail renders interactive value and composition charts alongside the actual dated valuation history link. An explicitly selected reporting date controls both financial summaries and chart cutoff; without an explicit date, detail uses the browser-local chart date once available, with the existing UTC fallback until it is shared.
 
 Desktop uses a wider financial column beside ownership/classification disclosure. iPhone stacks these sections and filters, preserving dates and value signs. Metadata filters and ownership detail use native progressive disclosure, keeping the ordinary browse experience focused on values. Browse/detail navigation retains the selected reporting date. Action/valuation history links pass the investment identity into the existing EPIC 2 history/correction surface; detail introduces no parallel mutation UI.
 
-Apache ECharts is the planned charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
+## Charts
+
+Apache ECharts is the charting system. Charts are first-class product surfaces and should follow the Monarch-inspired output language above rather than raw library defaults.
 
 ### Chart hierarchy
 
@@ -93,11 +93,11 @@ The stacked composition chart should be able to group the same underlying invest
 - investment;
 - asset class;
 - account type;
-- owner;
+- owner-set bucket (joint owners remain one segment);
 - tax status where useful; and
-- custom group.
+- liquidity and institution.
 
-Additional grouping dimensions should reuse canonical classifications rather than creating chart-specific financial state.
+Custom groups filter reporting scopes; overlapping membership is never an additive stacking dimension. Additional grouping dimensions should reuse canonical classifications rather than creating chart-specific financial state.
 
 ### Chart behavior and styling
 
@@ -111,6 +111,22 @@ Additional grouping dimensions should reuse canonical classifications rather tha
 - When a selected point/date changes, reflect the important date/value context outside the tooltip where the surrounding surface benefits from it.
 
 On desktop, charts support hover and precise pointer inspection. On iPhone, they support touch scrubbing with a stable crosshair or selection marker, appropriately sized targets, and behavior that does not trap ordinary page scrolling. Small screens may simplify legends or move composition details into a drill-down surface rather than compressing unreadable labels.
+
+### Historical chart rendering contract
+
+The shared ValueTrendChart and CompositionChart consume the authoritative historical-series outputs. NAV is the default trend; gross value and investment-linked debt are optional measure controls. Grouping choices are restricted to supplied additive series: investment, asset class, account type, tax status, liquidity, institution, and owner set. Labels and stable bucket keys come from analytics.
+
+Overview and investment-detail chart queries default to the browser's local calendar date, matching valuation entry. An explicit detail reporting date instead controls the cutoff and does not synchronize back to local today. A date-only session cookie conveys this reporting date to fresh server reads; first visits show a loading state until it is available. Revisiting charts updates a changed local date without storing financial values.
+
+Both charts use an elapsed-calendar-time axis and unsmoothed steps between recorded snapshots. Dots identify actual observations; intermediate positions never create a selectable financial point. A single observation is a dot, and an empty range has an explicit message. All, one-year, and three-month ranges filter existing observations relative to the supplied range end, without generating endpoint observations.
+
+Incomplete aggregate points are gaps in every visual series, even when individual buckets are available. The selected summary displays the unavailable total, coverage counts, and a disclosure of each constituent's actual mark date and supplied age. Exact available bucket values remain inspectable below composition; missing valuations never become zero. An absent bucket has no scope members at that date and contributes no area; its detail reads "Not in scope on this date". A bucket's position and color remain stable across range changes, ordered by its canonical key. Each composition series has a numeric endpoint label matching its numbered breakdown entry; these identifiers remain stable across ranges and distinguish buckets when palette colors repeat. Endpoint labels shift vertically to avoid overlap.
+
+Composition uses stacked NAV areas only when the visible range has no negative segments. If any supplied segment is negative, the entire visible range uses separate step lines and an explicit explanation. This avoids implying that separate positive/negative stacks form one total boundary. Negative values and the supplied aggregate remain exact in the selected-date summary and labeled segment breakdown.
+
+Hover selects the nearest recorded date on desktop. Touch taps and horizontal drags select observations; the plot uses pan-y touch behavior so ordinary vertical scrolling remains available. A dashed crosshair retains the selected observation after pointer exit. A labeled native date selector provides keyboard and non-pointer inspection. All essential dates, values, coverage and segment labels remain outside the SVG. Date selection persists across range/group changes when present; otherwise it selects the latest remaining observation. No tooltip is required to obtain financial information.
+
+The neutral chart frame, as-of labels, exact-money formatting, controls and categorical CSS tokens reuse the shared financial presentation system. Chart headings stay in the surrounding frame rather than the plot renderer. Browser checks exercise the real React components and ECharts renderer with synthetic analytics, including Chromium phone touch emulation; physical iPhone Safari/PWA validation remains a device check.
 
 ## Responsive behavior
 
@@ -139,7 +155,6 @@ Likely reusable components include value summaries, metric cards, as-of labels, 
 ## Open design decisions
 
 - visual identity, palette, typography, and icon system;
-- chart behavior for sparse or irregular valuation marks;
 - density and interaction model for large investment lists; and
 - install and update prompts for the PWA; offline financial-data behavior requires a separate security and product decision.
 
@@ -152,9 +167,9 @@ The password-only sign-in screen uses the shell's existing color, type, spacing,
 
 Overview leads with **aggregate investment NAV**, selected-period change, reporting date, and explicit valuation coverage across the full tracked-investment household boundary, including closed investments. Actual constituent mark dates and ages are available in a disclosure. Incomplete aggregates show no partial numeric headline. Period contributions, distributions, and recorded net external cash flow remain readable when endpoint coverage prevents performance calculation. Year to date (default), last three months, and last year use calendar boundaries, clamping month ends. Period performance and inception capital/returns remain separately labeled and come directly from analytics.
 
-Separate first-class value-history and composition frames occupy the chart area. Until #49/#50 lands, the history frame offers recorded snapshot summaries, and composition displays the authoritative current NAV by asset class; neither manufactures chart geometry, observations, or allocation percentages. Chart integration should replace these frame contents while retaining the surrounding summary hierarchy and common reporting date. Desktop places value/debt beside inception capital/returns. Phones place the chart area ahead of supporting performance/return metrics, then the concise four-investment preview and full-list navigation.
+Separate first-class value-trend and composition charts from #49/#50 occupy the chart area, using the same explicit reporting cutoff as summary analytics. Their own All/1Y/3M controls inspect recorded history independently of the selected performance-summary period. Current asset-class NAV remains available in a disclosure. Missing observations and single-point series retain the existing chart empty/sparse behavior; no values or allocation percentages are manufactured. Desktop places value/debt beside inception capital/returns. Phones place the chart area ahead of supporting performance/return metrics, then the concise four-investment preview and full-list navigation.
 
-Overview and Update Center resolve today's calendar date in the browser before requesting financial analytics, then carry an explicit editable reporting date in the URL. Initial navigation shows a loading state until that date is supplied; no financial records are persisted in browser storage. Requested historical dates stay authoritative.
+Overview and Update Center resolve today's calendar date in the browser before requesting financial analytics, then carry an explicit editable reporting date in the URL. Initial navigation shows a loading state until that date is supplied; the shared chart-date synchronizer stores only a date-only session cookie, never financial records. Requested historical dates stay authoritative.
 
 Update Center uses a presentation-only reminder policy: **Missing valuation** before all other records; **Stale valuation** after 90 calendar days; **Update due** at 31–90 days; **Recent valuation** at 0–30 days. Within a band, older marks come first, then name and stable identity. This policy uses snapshot-supplied mark age and never alters valuation alignment, financial semantics, or persisted records. Missing coverage is distinct from a recorded zero value. Investments closed on or before the requested date appear in retained-history disclosure without recurring update prompts; earlier requested dates may still show them as eligible for historical valuation entry.
 

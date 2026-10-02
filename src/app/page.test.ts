@@ -78,7 +78,7 @@ describe("household Overview", () => {
     sources.investments = sources.investments.filter((item) => sources.marks.some((mark) => mark.investmentId === item.id));
     const html = await home();
     expect(html).toContain("No contributions are recorded");
-    expect(html).toContain("One recorded observation");
+    expect(html).toContain("Only one observation is available.");
   });
   it("handles empty, unconfigured, failed and invalid-date reads without driver details", async () => {
     sources = { investments: [], marks: [], actions: [] };

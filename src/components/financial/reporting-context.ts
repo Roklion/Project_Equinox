@@ -26,7 +26,5 @@ export function periodStart(date: string, range: OverviewRange) {
   const lastDay = new Date(target);
   lastDay.setUTCMonth(lastDay.getUTCMonth() + 1, 0);
   target.setUTCDate(Math.min(day, lastDay.getUTCDate()));
-  const result = target.toISOString().slice(0, 10);
-  // The domain supports four-digit calendar years starting at 0001.
-  return result < "0001-01-01" ? "0001-01-01" : result;
+  return target.toISOString().slice(0, 10);
 }
