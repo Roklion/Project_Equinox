@@ -4,6 +4,7 @@ const device = process.env.E2E_DEVICE ?? "desktop";
 const port = process.env.E2E_PORT ?? "3102";
 export default defineConfig({
   testDir: "./e2e",
+  outputDir: "test-results/bootstrap-" + device,
   testMatch: "bootstrap.spec.ts",
   timeout: 120_000,
   expect: { timeout: 10_000 },

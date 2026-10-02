@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("clean migrations -> authenticated household setup -> first unclassified investment", async ({ page }) => {
+test("clean migrations -> authenticated household setup -> first unclassified investment", async ({ page }, info) => {
   await page.goto("/investments/new");
   await expect(page).toHaveURL(/[/]login$/);
   await page.getByLabel("App password").fill("synthetic-equinox-test-password");
@@ -29,13 +29,21 @@ test("clean migrations -> authenticated household setup -> first unclassified in
 
   // Let the real server commit, but lose its first response. Retry must preserve
   // both identities and must not create more household/owner rows.
+  await page.screenshot({ path: info.outputPath("setup.png"), fullPage: true });
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => { release = resolve; });
   let writes = 0;
   await page.route("**/api/setup", async (route) => {
     writes++;
-    if (writes === 1) { await route.fetch(); await route.abort("failed"); }
+    if (writes === 1) { await released; await route.fetch(); await route.abort("failed"); }
     else await route.continue();
   });
   await page.getByRole("button", { name: "Create household" }).click();
+  await expect(page.getByRole("button", { name: "Setting up…" })).toBeDisabled();
+  await expect(name).toBeDisabled();
+  await expect(page.getByLabel("Owner 1 name")).toBeDisabled();
+  expect(writes).toBe(1);
+  release();
   await expect(page.getByText("Unable to confirm setup. Your values are still here; retry safely.")).toBeVisible();
   await expect(name).toHaveValue("Sample household");
   const before = await (await page.request.get("/api/investments")).json();

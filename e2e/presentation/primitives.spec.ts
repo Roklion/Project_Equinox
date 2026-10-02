@@ -33,3 +33,12 @@ test("financial values, unavailable reasons, old marks and dates fit both layout
   expect(columns).toBe(testInfo.project.name === "iphone" ? 1 : 2);
   await page.screenshot({ path: testInfo.outputPath("presentation.png"), fullPage: true });
 });
+
+test("unavailable and ambiguous returns retain explanations without false zero values", async ({ page }) => {
+  await expect(page.getByText(/Unavailable: The dated cash flows/)).toBeVisible();
+  await expect(page.getByText(/Multiple candidate returns need review/)).toBeVisible();
+  await expect(page.getByText("0.00%", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("0.00×", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("main")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+});

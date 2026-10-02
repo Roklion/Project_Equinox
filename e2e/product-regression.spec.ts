@@ -1,0 +1,113 @@
+import { expect, test, type Page } from "@playwright/test";
+import { signIn } from "./helpers";
+
+async function usablePage(page: Page) {
+  await expect(page.getByRole("main")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+}
+async function focusedControl(page: Page, label: string) {
+  const input = page.getByLabel(label, { exact: true });
+  await input.focus();
+  await expect(input).toBeFocused();
+  expect(await input.evaluate((node) => getComputedStyle(node.closest(".money-input") ?? node).outlineStyle)).toBe("solid");
+  expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+}
+
+test("product journey preserves management, financial entry, maintenance, and historical semantics", async ({ page }, info) => {
+  await signIn(page);
+  const navigation = page.getByRole("navigation", { name: "Primary" });
+  await page.keyboard.press("Tab");
+  // Client navigation can retain focus; start explicitly at the skip link.
+  await page.getByRole("link", { name: "Skip to content" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  await navigation.getByRole("link", { name: "Investments", exact: true }).click();
+  await page.getByRole("link", { name: "Add investment", exact: true }).click();
+  await expect(page.getByLabel("Display name")).toBeVisible();
+  await focusedControl(page, "Display name");
+  await usablePage(page);
+  const originalName = "Product journey " + info.project.name;
+  const name = originalName + " renamed";
+  await page.getByLabel("Display name").fill(originalName);
+  await page.getByLabel("Owner A", { exact: true }).check();
+  await page.getByRole("button", { name: "Create investment", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Investment created", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "View investment", exact: true }).click();
+  await expect(page).toHaveURL(/[/]investments[/][0-9a-f-]{36}([?].*)?$/);
+  const investmentId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await expect(page.getByRole("heading", { level: 1, name: originalName })).toBeVisible();
+  await page.getByRole("link", { name: "Manage investment", exact: true }).click();
+  await page.getByLabel("Display name").fill(name);
+  await page.getByRole("button", { name: "Save investment", exact: true }).click();
+  await expect(page.getByText("Investment updated. Financial history is unchanged.")).toBeVisible();
+  await page.goto("/investments/" + investmentId + "?date=2026-10-01");
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await expect(page.locator(".page-heading .headline-number")).toContainText("Valuation coverage is incomplete");
+  await page.getByRole("link", { name: "Add financial action", exact: true }).click();
+  await expect(page.locator(".action-grid .action-choice")).toHaveCount(4);
+  await expect(page.getByRole("link", { name: "Add investment", exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: /Contribution/ }).click();
+  await page.getByLabel("Effective date", { exact: true }).fill("2026-10-01");
+  await expect(page.getByText("Checking investments and date…")).toBeHidden();
+  await page.getByLabel("Investment", { exact: true }).selectOption({ label: name });
+  await page.getByLabel("Amount contributed", { exact: true }).fill("100");
+  await page.getByRole("button", { name: "Save contribution", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Contribution saved", exact: true })).toBeVisible();
+  await page.goto("/updates?date=2026-10-01");
+  const maintenanceRow = page.locator(".maintenance-item").filter({ has: page.getByRole("heading", { name, exact: true }) });
+  await expect(maintenanceRow.getByText("Missing valuation", { exact: true })).toBeVisible();
+  await maintenanceRow.getByRole("link", { name: "Update valuation", exact: true }).click();
+  await expect(page.getByLabel("Investment", { exact: true })).toHaveValue(investmentId);
+  await expect(page.getByText("Checking investments and date…")).toBeHidden();
+  await page.getByLabel("Gross investment value", { exact: true }).fill("100");
+  await page.getByLabel("Investment-linked debt", { exact: true }).fill("150");
+  await focusedControl(page, "Gross investment value");
+  await page.getByRole("button", { name: "Save valuation mark", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Valuation saved", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Return to Update Center", exact: true }).click();
+  await expect(maintenanceRow.getByText("−$50.00", { exact: true })).toBeVisible();
+  await expect(maintenanceRow.getByText("Recent valuation", { exact: true })).toBeVisible();
+  await page.goto("/investments/" + investmentId + "?date=2026-10-01");
+  await expect(page.locator(".page-heading .headline-number")).toHaveText("−$50.00");
+  await expect(page.getByText(/The dated cash flows do not support an annualized return/)).toBeVisible();
+  await expect(page.getByText("0.00%", { exact: true })).toHaveCount(0);
+  for (const chartName of ["Value over time", "Composition over time"]) {
+    const chart = page.getByRole("region", { name: chartName });
+    await chart.getByLabel("Inspect recorded date").selectOption("2026-10-01");
+    await expect(chart.locator(".as-of-date time")).toHaveAttribute("datetime", "2026-10-01");
+    await expect(chart.locator(".headline-number")).toHaveText("−$50.00");
+    await expect(chart.locator('[aria-live="polite"]')).toHaveCount(1);
+    await chart.locator(".history-plot").scrollIntoViewIfNeeded();
+    expect(await chart.locator(".history-plot").evaluate((node) => getComputedStyle(node).touchAction)).toBe("pan-y");
+    const box = (await chart.locator(".history-plot").boundingBox())!;
+    if (info.project.name === "iphone") await page.touchscreen.tap(box.x + box.width / 2, box.y + 100);
+    else await page.mouse.move(box.x + box.width / 2, box.y + 100);
+    await expect(chart.locator(".headline-number")).toHaveText("−$50.00");
+  }
+  const composition = page.getByRole("region", { name: "Composition over time" });
+  await composition.getByLabel("Group by").selectOption("ownerSet");
+  await expect(composition.locator(".chart-segments")).toContainText("Owner A");
+  await expect(composition).toContainText(/negative/i);
+  const grouping = await composition.getByLabel("Group by").locator("option").allTextContents();
+  expect(grouping.some((label) => /custom.*group/i.test(label))).toBe(false);
+  await usablePage(page);
+  await page.getByRole("link", { name: "Manage investment", exact: true }).click();
+  await page.getByRole("button", { name: "Close investment", exact: true }).click();
+  await page.getByLabel("Close date", { exact: true }).fill("2026-10-01");
+  await page.getByLabel("I confirm closure and understand that history is preserved.").check();
+  await page.getByRole("button", { name: "Confirm close", exact: true }).click();
+  await expect(page.getByText("Investment closed. History is preserved.")).toBeVisible();
+  await page.goto("/investments?date=2026-10-01&lifecycle=closed");
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  await page.getByRole("link", { name, exact: true }).click();
+  await expect(page.getByRole("link", { name: "Add financial action", exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "Open action and valuation history", exact: true }).click();
+  const history = page.locator("article.history-item");
+  await expect(history.filter({ has: page.getByRole("heading", { name: "Contribution", exact: true }) })).toHaveCount(1);
+  await expect(history.filter({ has: page.getByRole("heading", { name: "Valuation mark", exact: true }) })).toHaveCount(1);
+  await usablePage(page);
+  await navigation.getByRole("link", { name: "Overview", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
+  await expect(page.getByText(/net worth/i)).toHaveCount(0);
+});
