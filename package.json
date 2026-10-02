@@ -25,6 +25,7 @@
     "db:migrate": "node --conditions=react-server --import tsx scripts/migrate.ts",
     "db:seed": "node --conditions=react-server --import tsx scripts/seed-demo.ts",
     "db:verify": "node --conditions=react-server --import tsx scripts/verify-database.ts",
+    "data:export": "node --conditions=react-server --import tsx scripts/export-data.ts",
     "db:reset": "docker compose --env-file .env.local down --volumes && npm run db:up && npm run db:migrate",
     "check": "npm run lint && npm run typecheck && npm test && npm run build"
   },

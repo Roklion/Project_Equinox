@@ -31,6 +31,8 @@ The eventual implementation should keep these responsibilities distinct:
 - **Analytics:** deterministic calculations that operate on dated values and cash flows without depending on UI components.
 - **Import and reconciliation:** explicit adapters that validate external data and preserve provenance without making a private spreadsheet a runtime source of truth.
 
+EPIC 5's source-neutral contracts and semantic validation live in `src/domain/migration`; the versioned portable bundle and unknown-JSON validator live in `src/domain/portability`. The export query in `src/application/export.ts` owns its repository port; `src/persistence/export.ts` implements a household-scoped, consistent canonical read. `scripts/export-data.ts` composes the local command without adding browser/runtime behavior. [Migration and portability](migration-and-portability.md) owns records, mapping behavior, expectation states, export v1 and private handling. Canonical financial rules and analytics remain authoritative; workbook adapters and later apply/reconciliation stay separate.
+
 The initial scaffold uses these homes:
 
 | Responsibility | Location |

@@ -14,11 +14,14 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 - [Product regression validation](docs/product-validation.md) maps the desktop/iPhone journeys, accessibility and financial presentation checks.
 - [Installable app validation](docs/pwa-validation.md) lists desktop and iPhone checks for the online-only experience.
 - [Backup and restore](docs/backup-and-restore.md) covers portable PostgreSQL dumps, retention, NAS scheduling, and disposable restore checks.
+- [Migration and portability](docs/migration-and-portability.md) defines source-neutral migration records, preflight findings, reconciliation expectations, and the private canonical export command/format.
 - [Agent guidance](AGENTS.md) defines repository working practices.
 
 ## Status
 
 The foundation includes a responsive shell, PostgreSQL tooling, password-only authentication, installable PWA metadata, canonical financial records, EPIC 2 entry/batch/history workflows, and authoritative EPIC 3 analytics. Responsive Investments/detail/management, household Overview summaries, and Update Center valuation maintenance consume those existing contracts. The four financial Add actions remain separate from investment creation. Overview integrates the merged interactive value-trend and composition charts, with a common reporting date and current asset-class composition. Offline financial-data behavior is intentionally deferred.
+
+EPIC 5 now has source-neutral migration contracts and a private, versioned canonical export command. See [migration and portability](docs/migration-and-portability.md) for the format, validation, command usage and remaining import/reconciliation boundaries.
 
 ## Local setup
 
