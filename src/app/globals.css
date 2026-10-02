@@ -333,3 +333,5 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
 .setup-fields { display: grid; gap: var(--space-3); border: 0; padding: 0; margin: 0; min-width: 0; }
 .setup-fields legend { font-weight: 700; padding: 0; margin-bottom: var(--space-2); }
 .setup-fields .text-button { min-height: 48px; }
+
+.chart-swatch[data-negative] { background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgb(0 0 0 / 55%) 3px 5px); }
