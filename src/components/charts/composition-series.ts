@@ -15,7 +15,7 @@ export function compositionPlotSeries(points: CompositionSeries["points"], unive
       endLabel: { show: negative ? typeof last === "number" && last < 0 : typeof last === "number" && last >= 0,
         formatter: () => String(index + 1), distance: 4, color: "inherit" },
       labelLayout: { moveOverlap: "shiftY" },
-      areaStyle: { opacity: negative ? 0.35 : 0.6 },
+      areaStyle: { opacity: negative ? 0.35 : 0.5 },
       itemStyle: negative ? { decal: { symbol: "rect", dashArrayX: [1, 0], dashArrayY: [2, 5],
         rotation: -Math.PI / 4, color: "rgba(0, 0, 0, 0.55)" } } : undefined,
       // Zero in the other half keeps one continuous signed stack at each date.
