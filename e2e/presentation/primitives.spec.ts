@@ -42,3 +42,24 @@ test("unavailable and ambiguous returns retain explanations without false zero v
   await expect(page.getByRole("main")).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 });
+
+test("all browse dimensions stay discoverable with usable controls and preserved URL context", async ({ page }, testInfo) => {
+  const filters = page.locator(".investment-filters");
+  for (const label of ["Asset class", "Account type", "Tax status", "Liquidity", "Institution", "Owner", "Custom group"]) {
+    const select = filters.getByLabel(label, { exact: true });
+    await expect(select).toBeVisible();
+    expect((await select.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await select.focus();
+    expect(await select.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
+  }
+  await expect(filters.getByLabel("Account type")).toHaveValue("accountType-id");
+  await expect(filters.getByLabel("Tax status")).toHaveValue("taxStatus-id");
+  await expect(filters.getByLabel("Liquidity")).toHaveValue("liquidity-id");
+  const values = await filters.evaluate((element) => Object.fromEntries(new FormData(element as HTMLFormElement)));
+  expect(values).toMatchObject({ date: "2026-10-01", lifecycle: "all", accountType: "accountType-id", taxStatus: "taxStatus-id", liquidity: "liquidity-id" });
+  await expect(filters.getByRole("link", { name: "Reset filters" })).toHaveAttribute("href", "/investments?date=2026-10-01&lifecycle=all");
+  const columns = await page.locator(".investment-filter-options").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+  expect(columns).toBe(testInfo.project.name === "iphone" ? 1 : 2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("browse-filters.png"), fullPage: true });
+});

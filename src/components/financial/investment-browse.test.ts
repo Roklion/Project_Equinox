@@ -31,3 +31,42 @@ describe("investment browse selection", () => {
     expect(() => reportingDate("2026-02-30")).toThrow();
   });
 });
+
+// Separate identities with identical labels ensure display text cannot drive selection.
+describe.each(["accountType", "taxStatus", "liquidity"] as const)("%s browse filter", (dimension) => {
+  const sources = canonicalSources();
+  for (const id of [ids.active, ids.closed]) {
+    sources.investments.find((item) => item.id === id)!.classifications[dimension] = { id: "selected-id", label: "Same label" };
+  }
+  sources.investments.find((item) => item.id === ids.partial)!.classifications[dimension] = { id: "other-id", label: "Same label" };
+  const items = calculateSnapshot(sources, endDate).constituents;
+  const selected = { [dimension]: "selected-id" };
+  const selectedIds = (query: Parameters<typeof browseInvestments>[1]) => browseInvestments(items, query).map((item) => item.investment.id);
+  it("intersects stable classification IDs with lifecycle selection", () => {
+    expect(selectedIds(selected)).toEqual([ids.active]);
+    expect(selectedIds({ ...selected, lifecycle: "closed" })).toEqual([ids.closed]);
+    expect(selectedIds({ ...selected, lifecycle: "all" })).toEqual([ids.active, ids.closed]);
+    expect(selectedIds({ [dimension]: "Same label", lifecycle: "all" })).toEqual([]);
+  });
+  it("composes with existing asset-class, owner and custom-group filters", () => {
+    expect(selectedIds({ ...selected, assetClass: sources.investments[0].classifications.assetClass!.id, owner: ownerA.id, group: groupA.id })).toEqual([ids.active]);
+    expect(selectedIds({ ...selected, owner: "unmatched-owner" })).toEqual([]);
+    expect(selectedIds({ ...selected, group: "unmatched-group" })).toEqual([]);
+    expect(selectedIds({ ...selected, assetClass: "unmatched-class" })).toEqual([]);
+    expect(selectedIds({ ...selected, institution: "unmatched-institution" })).toEqual([]);
+  });
+  it("keeps unclassified investments valid and choices available across lifecycle views", () => {
+    expect(selectedIds({})).toContain(ids.negative);
+    expect(selectedIds(selected)).not.toContain(ids.negative);
+    expect(browseChoices(items, dimension)).toEqual([{ id: "other-id", label: "Same label" }, { id: "selected-id", label: "Same label" }]);
+  });
+  it("preserves selection across a label rename without mutating financial results", () => {
+    const renamed = items.map((item) => ({ ...item, investment: { ...item.investment, classifications: {
+      ...item.investment.classifications, [dimension]: item.investment.classifications[dimension]?.id === "selected-id"
+        ? { id: "selected-id", label: "Renamed label" } : item.investment.classifications[dimension],
+    } } }));
+    expect(browseInvestments(renamed, selected).map((item) => item.investment.id)).toEqual([ids.active]);
+    expect(browseChoices(renamed, dimension)).toContainEqual({ id: "selected-id", label: "Renamed label" });
+    expect(browseInvestments(renamed, selected)[0].valuation).toBe(items[0].valuation);
+  });
+});
