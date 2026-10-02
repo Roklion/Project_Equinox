@@ -115,3 +115,22 @@ test("a range fallback persists when the previously selected observation returns
     await expect(dates).toHaveValue("2026-07-01");
   }
 });
+
+test("composition palette matches plotted areas/lines and remains stable across ranges", async ({ page }, info) => {
+  for (const fixture of ["complete", "negative"]) {
+    const chart = page.getByTestId(fixture).getByRole("region", { name: "Composition over time" });
+    const swatches = chart.locator(".chart-swatch");
+    const colors = await swatches.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
+    expect(new Set(colors).size).toBe(colors.length);
+    const strokes = await chart.locator("svg path").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).stroke));
+    for (const color of colors) expect(strokes).toContain(color);
+    if (fixture === "complete") {
+      const fills = await chart.locator("svg path").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill));
+      for (const color of colors) expect(fills).toContain(color);
+    }
+    await chart.getByRole("button", { name: "3M", exact: true }).click();
+    expect(await swatches.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor))).toEqual(colors);
+    await chart.getByRole("button", { name: "All", exact: true }).click();
+    await chart.screenshot({ path: info.outputPath(fixture + "-palette.png") });
+  }
+});

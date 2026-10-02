@@ -17,6 +17,7 @@ const available = <T,>(value: T) => ({ status: "available" as const, value });
         delta: available(-1000n), context: "this month" }),
       h(ValueBreakdown, { asOfDate, result: available({ grossValueCents: 10000n, debtCents: 15000n, navCents: -5000n }) }),
       h(ReturnMetric, { kind: "XIRR", asOfDate, result: { status: "unavailable", reason: "no_sign_change" } }),
+      h(ReturnMetric, { kind: "MOIC", asOfDate, result: { status: "ambiguous", reason: "Multiple candidate returns need review." } }),
       h(ChartFrame, { title: "Value trend", summary: h(HeadlineValue, { label: "Selected value", result: available(-5000n), asOfDate }),
         children: h("p", null, "Synthetic chart summary") }),
       h(InvestmentRow, { investment: { id: "synthetic", name: "Example investment", status: "active" }, asOfDate,

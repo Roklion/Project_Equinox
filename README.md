@@ -11,6 +11,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 - [Metrics](docs/metrics.md) defines financial measures and aggregation rules.
 - [Design system](docs/design-system.md) defines interface and interaction direction.
 - [Architecture](docs/architecture.md) defines technical boundaries and the initial platform direction.
+- [Product regression validation](docs/product-validation.md) maps the desktop/iPhone journeys, accessibility and financial presentation checks.
 - [Installable app validation](docs/pwa-validation.md) lists desktop and iPhone checks for the online-only experience.
 - [Backup and restore](docs/backup-and-restore.md) covers portable PostgreSQL dumps, retention, NAS scheduling, and disposable restore checks.
 - [Agent guidance](AGENTS.md) defines repository working practices.
@@ -42,6 +43,7 @@ Open [localhost:3000](http://localhost:3000). Unit tests and the production buil
 | `npm test` | Run the unit tests once |
 | `npm run test:watch` | Watch unit tests during development |
 | `npm run test:e2e` | Run focused desktop and iPhone-class browser workflows against a disposable PostgreSQL database |
+| `npm run test:bootstrap` | Test clean-database household setup and first investment on desktop and iPhone |
 | `npm run test:presentation` | Check shared financial layouts, dates, navigation, focus, and touch targets at desktop/iPhone widths without a database |
 | `npm run check` | Run lint, type checks, tests, and production build in order |
 | `npm run db:up` | Start local PostgreSQL with Docker Compose and wait for readiness |
@@ -80,6 +82,8 @@ npm run db:migrate
 The baseline records migration history; authentication migrations create failed-login throttling and session tables without introducing financial domain tables. Stop with `npm run db:down`; data survives. The password initializes a new volume, so changing the environment file does not change an existing database password.
 
 For an intentional **destructive rebuild of disposable local data**, run `npm run db:reset`. It removes the `equinox-local` Compose volume, starts a fresh database, and reapplies migrations. Verify `DATABASE_URL` points to this local database before running it. Do not use this workflow for shared or production data.
+
+For normal first use, sign in and complete household setup in the app, then create the first investment. No demo seed or classification records are required. See [first-run setup](docs/product-spec.md#first-run-household-setup).
 
 To populate that fresh local database with invented development records, run `npm run db:seed` after migrations. The command accepts only a loopback PostgreSQL host and an empty household database. A second run reports that the demo portfolio already exists. To rebuild disposable local data and seed again, run `npm run db:reset` followed by `npm run db:seed`. The seed includes example owners, classifications, five investment styles, a linked transfer, debt and negative equity, and a closed investment with retained history. It never runs automatically in production.
 

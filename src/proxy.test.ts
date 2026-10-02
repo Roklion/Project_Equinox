@@ -1,3 +1,4 @@
+import { householdSetupService } from "@/app/setup-data";
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSession, SESSION_COOKIE } from "./auth/session";
@@ -8,12 +9,16 @@ vi.mock("@/auth/store", () => ({
   isSessionActive: vi.fn(async () => true),
 }));
 
+vi.mock("@/app/setup-data", () => ({
+  householdSetupService: vi.fn(() => ({ getState: async () => ({ status: "configured", householdId: "home" }) })),
+}));
 const secret = "ab".repeat(32);
 const oldSecret = process.env.SESSION_SECRET;
 afterEach(() => {
   if (oldSecret === undefined) delete process.env.SESSION_SECRET;
   else process.env.SESSION_SECRET = oldSecret;
   vi.mocked(isSessionActive).mockResolvedValue(true);
+  vi.mocked(householdSetupService).mockReturnValue({ getState: async () => ({ status: "configured", householdId: "home" }) } as never);
   vi.restoreAllMocks();
 });
 
@@ -122,4 +127,30 @@ describe("route protection", () => {
     expect(response.cookies.get(SESSION_COOKIE)).toBeUndefined();
     expect(log).toHaveBeenCalledWith("Session validation failed due to a database error.");
   });
+});
+
+it("routes empty and inconsistent households to setup while keeping APIs protected", async () => {
+  process.env.SESSION_SECRET = secret;
+  for (const status of ["empty", "inconsistent"]) {
+    vi.mocked(householdSetupService).mockReturnValue({ getState: async () => ({ status }) } as never);
+    for (const path of ["/", "/add", "/investments/new", "/updates", "/investments/history"]) {
+      const response = await proxy(new NextRequest("http://localhost:3000" + path, {
+        headers: { cookie: SESSION_COOKIE + "=" + createSession(secret) },
+      }));
+      expect(response.headers.get("location")).toBe("http://localhost:3000/setup");
+    }
+    expect((await proxy(new NextRequest("http://localhost:3000/setup", {
+      headers: { cookie: SESSION_COOKIE + "=" + createSession(secret) },
+    }))).status).toBe(200);
+  }
+  expect((await proxy(new NextRequest("http://localhost:3000/api/setup"))).status).toBe(401);
+});
+
+it("routes a household lookup outage to the safe setup recovery surface", async () => {
+  process.env.SESSION_SECRET = secret;
+  vi.mocked(householdSetupService).mockReturnValue({ getState: async () => { throw new Error("private details"); } } as never);
+  const response = await proxy(new NextRequest("http://localhost:3000/investments", {
+    headers: { cookie: SESSION_COOKIE + "=" + createSession(secret) },
+  }));
+  expect(response.headers.get("location")).toBe("http://localhost:3000/setup");
 });

@@ -48,7 +48,7 @@ async function main() {
     const connection = createDatabase(databaseUrl.toString());
     try {
       await migrateDatabase(connection.db);
-      await seedDemoPortfolio(connection.db);
+      if (process.env.E2E_EMPTY !== "1") await seedDemoPortfolio(connection.db);
     } finally {
       await connection.pool.end();
     }
