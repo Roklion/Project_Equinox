@@ -18,8 +18,11 @@ export function NavigationLinks({ pathname }: { pathname: string }) {
           className={href === "/add" ? "navigation-add" : undefined}>{label}</Link>;
       })}
     </nav>
-    <form action="/api/auth/logout" method="post" className="shell-signout">
-      <button className="text-button" type="submit">Sign out</button>
-    </form>
+    <div className="shell-secondary">
+      <Link href="/settings" aria-current={pathname === "/settings" ? "page" : undefined}>Settings</Link>
+      <form action="/api/auth/logout" method="post" className="shell-signout">
+        <button className="text-button" type="submit">Sign out</button>
+      </form>
+    </div>
   </div>;
 }

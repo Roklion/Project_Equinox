@@ -61,6 +61,12 @@ The MVP accepts one mark per investment and calendar date. A second insert is re
 
 An investment-history correction may also change a mark's as-of date while retaining the mark's identity. The corrected date must be valid for the investment lifecycle and must not collide with another mark for the same investment. A collision fails the correction without replacing the other mark.
 
+## Runtime administration
+
+Household, owner and classification names are mutable display data; renaming preserves their IDs and all investment/financial records. Administration accepts 1–200 characters after trimming. Classification/custom-group create and rename reject an exact matching label within that household and dimension, excluding the record being renamed. Equality is case-sensitive, consistent with migration label resolution. Existing database identity constraints do not impose label uniqueness; the administration application path checks duplicates before writing and does not merge preexisting duplicate records. Owner names may repeat, preserving existing owner semantics; distinct display names are encouraged for clear selection.
+
+Removing an owner, classification or custom group is allowed only if no investment (including closed investments) references it. Reference checks and restrictive foreign keys prevent silent association removal. Reclassification and membership removal use the existing investment metadata workflow first. A removal never changes financial history. Household deletion, additional households, owner percentages and classification history remain outside the MVP.
+
 ## Lifecycle
 
 Creation requires a display name and at least one household owner, but no opening financial record. Metadata editing retains the investment ID and replaces current owner/classification/custom-group associations without rewriting actions or valuations; optional classifications and groups can be cleared. Closed investments may also have their metadata edited, preserving lifecycle status and close date. All selected records must belong to the same household. Closing requires an explicit calendar date on or after all recorded actions and valuations; an earlier date is rejected while history remains unchanged.
