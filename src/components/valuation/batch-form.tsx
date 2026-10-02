@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import type { InvestmentOption, StoredMark } from "@/application/ports";
 import { formatCents, netValue, parseSignedCents } from "@/domain/financial";
@@ -81,9 +82,10 @@ function today() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
-export function BatchForm() {
+export function BatchForm({ initialDate, returnToUpdates = false }: { initialDate?: string; returnToUpdates?: boolean }) {
+  const router = useRouter();
   const browserDate = useSyncExternalStore(subscribe, today, () => "");
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(initialDate ?? null);
   const selectedDate = date ?? browserDate;
   const [investments, setInvestments] = useState<InvestmentRow[]>([]);
   const [inputs, setInputs] = useState<Record<string, RowInput>>({});
@@ -159,6 +161,7 @@ export function BatchForm() {
         }
       } else {
         setInputs({}); setMessage("");
+        router.refresh();
         setSavedMessage(`${rows.length} valuation ${rows.length === 1 ? "mark" : "marks"} saved for ${selectedDate}.`);
         setLoadFailed(false); setLoading(true); setRefresh((value) => value + 1);
       }
@@ -206,6 +209,7 @@ export function BatchForm() {
     })}</div>
     {message && <p role="status" className={Object.keys(errors).length ? "form-error" : "entry-muted"}>{message}</p>}
     <BatchSaveNotice message={savedMessage} />
+    {savedMessage && returnToUpdates && <div className="entry-actions"><Link prefetch={false} href={"/updates?date=" + (initialDate ?? selectedDate)}>Return to Update Center</Link></div>}
     <div className="entry-actions"><button className="primary-button" type="submit" disabled={loading || saving || investments.length === 0}>
       {saving ? "Saving…" : "Save entered marks"}</button><Link href="/add">All actions</Link></div>
   </form>;

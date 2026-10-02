@@ -9,8 +9,8 @@ export async function signIn(page: Page) {
   await page.getByRole("button", { name: "Sign in" }).click();
   const loginResponse = await loginResponsePromise;
   expect(loginResponse.status(), "synthetic browser-test login should succeed").toBe(200);
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Keep your investment story current." })).toBeVisible();
+  await expect(page).toHaveURL(/\/(?:\?date=[0-9-]+&range=ytd)?$/);
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
 }
 
 export async function openHistory(page: Page, name: string) {

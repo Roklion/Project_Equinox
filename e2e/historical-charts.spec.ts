@@ -22,8 +22,13 @@ test("authenticated charts use persisted household and investment series", async
   await composition.getByLabel("Group by").selectOption("ownerSet");
   await expect(composition.locator(".chart-segments")).toContainText(/Owner A \+ Owner B|Owner B \+ Owner A/);
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Investments", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Investments", exact: true, level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Sample Market Account", exact: true }).click();
-  await page.getByRole("region", { name: "Value over time" }).getByLabel("Inspect recorded date").selectOption("2025-06-30");
+  await expect(page.getByRole("heading", { name: "Sample Market Account", exact: true, level: 1 })).toBeVisible();
+  const detailDate = page.getByRole("region", { name: "Value over time" }).getByLabel("Inspect recorded date");
+  await expect(page.getByRole("region", { name: "Value over time" }).locator("svg")).toBeVisible();
+  await detailDate.selectOption("2025-06-30");
+  await expect(detailDate).toHaveValue("2025-06-30");
   await expect(page.getByRole("region", { name: "Value over time" }).locator(".headline-number")).toHaveText("$9,400.00");
   await expect(page.getByRole("region", { name: "Composition over time" }).locator(".chart-segments")).toContainText("Sample Market Account");
 });

@@ -305,3 +305,26 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
 @media (max-width: 40rem) {
   .investment-filters, .investment-detail-layout, .investment-filter-options { grid-template-columns: 1fr; }
 }
+
+/* Overview and maintenance compose the shared financial primitives. */
+.overview-coverage { border-block: 1px solid var(--color-border); padding-block: var(--space-2); }
+.coverage-list { padding-left: var(--space-3); }
+.coverage-list li { padding-block: var(--space-1); }
+.coverage-list .valuation-age { margin-block: var(--space-1); }
+.overview-supporting { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.overview-supporting > * { min-width: 0; }
+.maintenance-item { padding-block: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.maintenance-band { font-weight: 700; margin-block: var(--space-1); }
+.maintenance-item .investment-row { border: 0; box-shadow: none; }
+.maintenance-item .entry-actions a { min-height: 48px; display: inline-flex; align-items: center; }
+@media (max-width: 40rem) {
+  .overview-supporting { grid-template-columns: 1fr; gap: 0; }
+  .maintenance-item .entry-actions a { display: grid; }
+}
+
+@media (max-width: 40rem) {
+  .overview-page { display: flex; flex-direction: column; }
+  .overview-period { order: 1; }
+  .overview-supporting { order: 2; }
+  .overview-investments { order: 3; }
+}

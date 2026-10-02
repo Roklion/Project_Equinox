@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { InvestmentOption, StoredMark } from "@/application/ports";
 import { formatCents, netValue, parseSignedCents } from "@/domain/financial";
@@ -51,13 +52,16 @@ function InvestmentSelect({ id, label, value, onChange, options, errors, exclude
   );
 }
 
-export function EntryForm({ kind }: { kind: Kind }) {
+export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnToUpdates = false }: {
+  kind: Kind; initialInvestmentId?: string; initialDate?: string; returnToUpdates?: boolean;
+}) {
+  const router = useRouter();
   const saving = useRef(false);
   const lastFetched = useRef<{ date: string; investmentId: string; kind: Kind; refresh: number } | null>(null);
   const browserDate = useSyncExternalStore(emptySubscribe, localCalendarDate, serverCalendarDate);
-  const [dateOverride, setDateOverride] = useState<string | null>(null);
+  const [dateOverride, setDateOverride] = useState<string | null>(initialDate ?? null);
   const date = dateOverride ?? browserDate;
-  const [investmentId, setInvestmentId] = useState("");
+  const [investmentId, setInvestmentId] = useState(initialInvestmentId);
   const [destinationInvestmentId, setDestinationInvestmentId] = useState("");
   const [amount, setAmount] = useState("");
   const [grossValue, setGrossValue] = useState("");
@@ -159,6 +163,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
         : kind === "transfer" ? "Transfer saved" : kind === "contribution" ? "Contribution saved" : "Withdrawal saved");
       setSavedDate(payload.date);
       setSaved(true);
+      router.refresh();
       setRefresh((current) => current + 1);
     } catch {
       setSaveError("Unable to save this entry. Please try again.");
@@ -172,7 +177,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
     return (
       <section className="entry-panel entry-success" role="status">
         <p className="eyebrow">Saved</p><h2>{savedLabel}</h2>
-        <p>Your entry is recorded for {savedDate}. You can add another entry or return to the overview.</p>
+        <p>Your entry is recorded for {savedDate}. You can add another entry or return to your investment context.</p>
         <div className="entry-actions">
           <button type="button" className="primary-button" onClick={() => {
             setSaved(false); setAmount(""); setGrossValue(""); setDebt("");
@@ -182,7 +187,7 @@ export function EntryForm({ kind }: { kind: Kind }) {
               setInvestmentId(""); setLoading(true); setContext(null); setLatest(null);
             }
           }}>Add another</button>
-          <Link href="/">Overview</Link>
+          <Link prefetch={false} href={returnToUpdates ? "/updates?date=" + (initialDate ?? savedDate) : "/"}>{returnToUpdates ? "Return to Update Center" : "Overview"}</Link>
         </div>
       </section>
     );
