@@ -145,4 +145,4 @@ GitHub Actions runs `npm ci`, lint, type checking, unit tests, a clean database 
 
 ## Local migration tooling
 
-EPIC 5 now includes a configurable local XLSX adapter, read-only preflight, atomic canonical import service and analytics-based reconciliation, with synthetic fixtures and PostgreSQL rollback checks. See [migration and portability](docs/migration-and-portability.md) for mapping formats, target safety and private artifact handling. The composed private migration CLI and final EPIC regression/runbook remain separate #68/#70 work.
+EPIC 5 now includes a configurable local XLSX adapter, read-only preflight, atomic canonical import service and analytics-based reconciliation, with synthetic fixtures and PostgreSQL rollback checks. See [migration and portability](docs/migration-and-portability.md) for mapping formats, target safety and private artifact handling. The private `npm run data:migrate --` CLI supports inspect, preflight, explicit apply and reconciliation with local JSON reports. Its documented operating sequence includes backup, rehearsal, target apply and private cleanup; final EPIC regression remains #70.
