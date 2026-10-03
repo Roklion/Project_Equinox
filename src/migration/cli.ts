@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
-import { createMigrationService, MigrationError } from "@/application/migration";
+import { createMigrationService, migrationInvestmentId, MigrationError } from "@/application/migration";
 import type { ImportFinding, MigrationRepository } from "@/application/migration-ports";
 import { createReconciliationService } from "@/application/reconciliation";
 import type { AnalyticsRepository } from "@/application/analytics-ports";
@@ -74,8 +74,10 @@ export async function runMigrationCli(args: string[], config: {
     const rules = options.annotations ? readRules(await json(options.annotations)) : [];
     if (manifest && (manifest.householdId !== mapping.householdId || manifest.datasetId !== input.dataset.datasetId
       || Object.keys(manifest.ids).length !== input.dataset.records.length || input.dataset.records.some(r => !Object.hasOwn(manifest.ids, r.sourceKey)))) throw new Error();
-    const investmentIds = input.dataset.records.filter(r => r.kind === "investment").map(r => manifest?.ids[r.sourceKey]);
-    if (manifest && new Set(investmentIds).size !== investmentIds.length) throw new Error();
+    const investmentRecords = input.dataset.records.filter(r => r.kind === "investment");
+    const investmentIds = investmentRecords.map(r => manifest?.ids[r.sourceKey]);
+    if (manifest && (new Set(investmentIds).size !== investmentIds.length || investmentRecords.some(r =>
+      manifest.ids[r.sourceKey] !== (mapping.investments?.[r.sourceKey] ?? migrationInvestmentId(mapping.householdId, input.dataset.datasetId, r.sourceKey))))) throw new Error();
     connection = (config.connect ?? connect)(databaseUrl(config.env ?? process.env));
     if (command === "reconcile") {
       // Existing history is expected here; use domain validation, not import collision policy.
