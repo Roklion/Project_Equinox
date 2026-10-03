@@ -57,6 +57,12 @@ Local use of a private spreadsheet for a future migration or reconciliation work
 
 ## First-run household setup
 
-The password-protected personal MVP exposes one household. On a clean migrated database, authenticated navigation goes to first-run setup, which creates a USD household with a display name and at least one initial owner. Household and owner identities are stable; creation commits atomically. Setup retries return the configured household without changing its names or adding owners, including after an uncertain response. Existing installations bypass setup. Multiple households produce an explicit configuration recovery state, never arbitrary selection. There is no ordinary household creation/switching or owner administration surface.
+The password-protected personal MVP exposes one household. On a clean migrated database, authenticated navigation goes to first-run setup, which creates a USD household with a display name and at least one initial owner. Household and owner identities are stable; creation commits atomically. Setup retries return the configured household without changing its names or adding owners, including after an uncertain response. Existing installations bypass setup. Multiple households produce an explicit configuration recovery state, never arbitrary selection. There is no ordinary household creation or switching.
 
 After setup, Add investment is immediately available. Optional classifications may remain empty; no demo seed or lookup population is required. Authentication remains the single-password model.
+
+## Runtime administration
+
+Settings exposes Household & owners and Classifications after setup. Users can rename the configured household, add/rename/remove owners, and maintain asset classes, account types, tax statuses, liquidity, institutions and custom groups. Names accept 1–200 characters after trimming. New choices are available in Add/Edit Investment, whose Manage links provide a return path. Operators can create canonical owners before migration preflight without coupling settings to import code.
+
+Renames retain stable IDs and current investment associations; financial history is unchanged. Removing any value, including an owner or custom group, requires confirmation and is blocked while an active or closed investment uses it. Users must explicitly reassign investment metadata first. No cascade deletion or silent clearing is offered. Duplicate-name rules and canonical identity semantics are defined in [the data model](data-model.md#runtime-administration).

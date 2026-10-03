@@ -7,6 +7,7 @@ EPIC 4's final integration pass protects the personal household product on Deskt
 | Contract | Coverage owner |
 | --- | --- |
 | Clean migrations, authentication, zero-household routing, owner validation, multi-owner setup, lost-response retry, immediate unclassified investment, configured setup bypass | e2e/bootstrap.spec.ts, run separately against a fresh database for each viewport |
+| Post-bootstrap household rename; add/rename/remove owners and all classification dimensions; duplicate errors and retained input; pending writes; in-use removal blocks; return to investment choices; stable IDs, associations and financial history | e2e/settings-workflow.ts, composed into the clean bootstrap journey for both viewports; src/persistence/settings.integration.test.ts covers cross-household isolation and closed-investment references |
 | Overview -> Investments -> detail -> management -> contribution -> Update Center -> single valuation -> chart inspection -> closure -> retained history | e2e/product-regression.spec.ts |
 | Create/edit classification and ownership, close-date conflicts, historical accessibility, investment identity/history preservation | e2e/investment-management.spec.ts |
 | Active/closed filters, metadata filters, missing valuations and unavailable detail | e2e/investments.spec.ts |
