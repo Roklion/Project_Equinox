@@ -154,8 +154,6 @@ Returned rates must be finite and within inclusive `-0.9999 <= r <= 1,000,000` (
 
 Returns are inception-to-date from complete recorded capital history, with no persisted or cached source-of-truth fields. Corrections or deletions of actions and marks change the next calculation naturally. The same query supports the existing owner, classification, investment and custom-group filters and retains closed investments. It never averages child rates or multiples.
 
-Regression tests include hand-checkable annual and leap-year cases, multiple contributions, partial/closed realization, transfer boundaries, missing marks, negative NAV, fixed-guess selection for a two-root example, non-convergence, returned-rate limits, long recurring histories, and [Microsoft's published irregular-date XIRR example](https://support.microsoft.com/en-us/excel/functions/xirr-function). No UI percentage rounding or TWR calculation is introduced.
-
 ## Historical value and composition queries
 
 The application exposes `valueSeries(householdId, startDate, endDate, scope)` and `compositionSeries(householdId, startDate, endDate, groupBy, scope)`. Both read canonical snapshot sources once through `endDate`, retaining older marks for carry-forward. Domain calculations live in `src/domain/analytics/series.ts` and reuse `calculateSnapshot` and `groupSnapshot`. Every point exposes all three exact-cent measures (`grossValueCents`, `debtCents`, `navCents`); callers choose the measure to render without financial recomputation.

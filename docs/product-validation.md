@@ -25,6 +25,12 @@ The product journey distinguishes the four financial Add actions from investment
 
 `src/domain/analytics/testing/canonical-fixture.ts` supplies the compact synthetic ledger. Domain and application regression tests assert independent expected values and cross-metric identities; `src/persistence/database.integration.test.ts` checks the same contracts through real canonical reads. Coverage includes transfer boundaries, joint ownership and overlapping groups, exact-cent aggregation, closed/partial realization, negative NAV, carried-forward and missing marks, combined-flow MOIC/XIRR, fixed-guess root selection and correction-driven recalculation. [Metrics](metrics.md) owns the definitions; the fixture and tests own the worked values.
 
+## Migration regressions
+
+`src/migration/end-to-end.integration.test.ts` runs the private CLI through inspection, non-mutating preflight, atomic apply, canonical analytics, reconciliation and validated export on disposable PostgreSQL. The temporary workbook generator uses the existing synthetic matrix with explicit owners, no source taxonomy and an intentionally ignored legacy grouping; the original adapter fixture separately exercises classification mapping.
+
+Assertions cover exact cents/calendar dates, joint ownership, transfer pairing/cancellation, debt and negative NAV, closed returns, historical carry-forward, missing source/coverage, annotated definition differences, valuation uniqueness, repeat rejection and exclusion of populated authentication state. CLI tests protect explicit target selection, private reports and manifest identity validation. `src/migration/privacy.test.ts` checks documented ignore rules/tracked paths; it does not certify arbitrary contents or repository history. All database cases run through `npm run test:db`; no real workbook or financial database is required.
+
 ## Commands and CI
 
 Run npm run check, npm run test:db, npm run test:presentation, npm run test:e2e and git diff --check against the intended base. The existing CI browser job runs the same presentation and E2E commands; test:e2e includes test:bootstrap after the seeded regression suite. test:bootstrap starts and cleans up a separate migration-only database per viewport; it never seeds it or resets an existing application database.

@@ -4,7 +4,7 @@
 
 Equinox is a responsive, online-only progressive web app using Next.js App Router, React and TypeScript, Apache ECharts, and standard PostgreSQL through Drizzle ORM and `pg`. Vercel hosts the application and Neon hosts PostgreSQL; [hosted deployment](hosted-deployment.md) owns release operations. Docker is a local development convenience, not a runtime dependency.
 
-Node.js and npm versions are declared in `.nvmrc` and `package.json`; `package-lock.json` records reproducible dependencies. Next.js lint tooling currently keeps ESLint on 9 and TypeScript on 6.0. Consult the installed, version-matched Next.js documentation when changing framework behavior. Python/FastAPI is not required; introduce another service only for a concrete capability that justifies the boundary.
+Node.js and npm versions are declared in `.nvmrc` and `package.json`; `package-lock.json` records reproducible dependencies. Next.js lint tooling currently keeps ESLint on 9 and TypeScript on 6.0. Consult the installed, version-matched Next.js documentation when changing framework behavior.
 
 ## Personal-app scope
 

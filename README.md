@@ -122,4 +122,4 @@ The role needs `CREATEDB`. Tests create and remove uniquely named databases, nev
 
 ## Data safety
 
-This repository is public. Use generic names and synthetic values in all checked-in artifacts. Real financial data, private account/institution details and anything copied or derived from a private workbook stay outside public checkouts. See [repository safety](AGENTS.md#repository-safety) and [private artifact handling](docs/migration-and-portability.md#private-local-command).
+This repository is public. Use generic names and synthetic values in all checked-in artifacts. Real financial data, private account/institution details and anything copied or derived from a private workbook must never become repository content. See [repository safety](AGENTS.md#repository-safety) and [private artifact handling](docs/migration-and-portability.md#private-artifact-conventions).

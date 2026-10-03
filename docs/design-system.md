@@ -152,11 +152,6 @@ The batch page lists active investments in stable name order, shows previous or 
 
 Shared financial presentation lives in `src/components/financial`; form and chart components reuse its formatting, states and accessibility behavior. Extend the existing owner when semantics match. Domain calculations remain outside presentation.
 
-## Open design decisions
-
-- density and interaction model for large investment lists; and
-- install and update prompts for the PWA; offline financial-data behavior requires a separate security and product decision.
-
 ## Authentication screen
 
 The password-only sign-in screen uses the shell's existing color, type, spacing, focus, and surface tokens. It provides one labeled password field, one primary action, and a generic failure message. The authenticated shell exposes sign out. The flow has no username, account creation, or password recovery controls in the personal MVP.

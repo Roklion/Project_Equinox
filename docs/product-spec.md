@@ -53,7 +53,7 @@ An MVP is successful when a user can maintain dated values and cash flows with l
 
 The repository is public. All checked-in examples, fixtures, tests, and screenshots must contain generic investment names and synthetic figures. Real personal financial data and any content copied or derived from a user's private investment spreadsheet are prohibited from repository content.
 
-Private workbook migration and reconciliation must follow [private artifact handling](migration-and-portability.md#private-local-command).
+Private workbook migration and reconciliation must follow [private artifact handling](migration-and-portability.md#private-artifact-conventions).
 
 ## First-run household setup
 
