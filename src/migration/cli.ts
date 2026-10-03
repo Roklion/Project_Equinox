@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
-import { createMigrationService, migrationInvestmentId, MigrationError } from "@/application/migration";
+import { createMigrationService, mappedInvestment, migrationInvestmentId, MigrationError } from "@/application/migration";
 import type { ImportFinding, MigrationRepository } from "@/application/migration-ports";
 import { createReconciliationService } from "@/application/reconciliation";
 import type { AnalyticsRepository } from "@/application/analytics-ports";
@@ -77,7 +77,7 @@ export async function runMigrationCli(args: string[], config: {
     const investmentRecords = input.dataset.records.filter(r => r.kind === "investment");
     const investmentIds = investmentRecords.map(r => manifest?.ids[r.sourceKey]);
     if (manifest && (new Set(investmentIds).size !== investmentIds.length || investmentRecords.some(r =>
-      manifest.ids[r.sourceKey] !== (mapping.investments?.[r.sourceKey] ?? migrationInvestmentId(mapping.householdId, input.dataset.datasetId, r.sourceKey))))) throw new Error();
+      manifest.ids[r.sourceKey] !== (mappedInvestment(input, r.sourceKey) ?? migrationInvestmentId(mapping.householdId, input.dataset.datasetId, r.sourceKey))))) throw new Error();
     connection = (config.connect ?? connect)(databaseUrl(config.env ?? process.env));
     if (command === "reconcile") {
       // Existing history is expected here; use domain validation, not import collision policy.
