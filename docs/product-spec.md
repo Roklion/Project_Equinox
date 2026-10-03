@@ -53,7 +53,7 @@ An MVP is successful when a user can maintain dated values and cash flows with l
 
 The repository is public. All checked-in examples, fixtures, tests, and screenshots must contain generic investment names and synthetic figures. Real personal financial data and any content copied or derived from a user's private investment spreadsheet are prohibited from repository content.
 
-Local use of a private spreadsheet for a future migration or reconciliation workflow is permitted only when its contents and derived artifacts remain outside the repository.
+Private workbook migration and reconciliation must follow [private artifact handling](migration-and-portability.md#private-artifact-conventions).
 
 ## First-run household setup
 
@@ -63,7 +63,7 @@ After setup, Add investment is immediately available. Optional classifications m
 
 ## Runtime administration
 
-Settings exposes Household & owners and Classifications after setup. Users can rename the configured household, add/rename/remove owners, and maintain asset classes, account types, tax statuses, liquidity, institutions and custom groups. Names accept 1–200 characters after trimming. New choices are available in Add/Edit Investment, whose Manage links provide a return path. Operators can create canonical owners before migration preflight without coupling settings to import code.
+Settings exposes Household & owners and Classifications after setup. Users can rename the configured household, add/rename/remove owners, and maintain asset classes, account types, tax statuses, liquidity, institutions and custom groups. New choices are available in Add/Edit Investment, whose Manage links provide a return path. Operators can create canonical owners before migration preflight without coupling settings to import code.
 
 Renames retain stable IDs and current investment associations; financial history is unchanged. Removing any value, including an owner or custom group, requires confirmation and is blocked while an active or closed investment uses it. Users must explicitly reassign investment metadata first. No cascade deletion or silent clearing is offered. Duplicate-name rules and canonical identity semantics are defined in [the data model](data-model.md#runtime-administration).
 
