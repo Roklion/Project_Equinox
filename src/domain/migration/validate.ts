@@ -1,5 +1,5 @@
 import { assertCalendarDate, parseCents } from "@/domain/financial";
-import type { ClassificationDimension } from "@/domain/investment";
+import { normalizeInvestmentName, type ClassificationDimension } from "@/domain/investment";
 import type { MigrationDataset, MigrationMapping, MigrationTarget, ValidationCode, ValidationFinding } from "./contracts";
 
 export const classificationDimensions: ClassificationDimension[] = ["assetClass", "accountType", "taxStatus", "liquidity", "institution", "customGroup"];
@@ -39,7 +39,7 @@ export function validateMigration(dataset: MigrationDataset, mapping: MigrationM
     const key = record.sourceKey;
     switch (record.kind) {
       case "investment":
-        if (!text(record.name)) add("invalid_identity", key, "name");
+        check("invalid_identity", key, "name", () => { normalizeInvestmentName(record.name); });
         if (!record.ownerKeys.length || record.ownerKeys.some((owner) => !Object.hasOwn(mapping.owners, owner) || !target.ownerIds.includes(mapping.owners[owner]))) add("unresolved_owner", key, "ownerKeys");
         for (const [dimension, value] of Object.entries(record.classifications)) {
           if (!classificationDimensions.includes(dimension as ClassificationDimension) || dimension === "customGroup") add("unsupported_record", key, "classifications");
@@ -68,12 +68,14 @@ export function validateMigration(dataset: MigrationDataset, mapping: MigrationM
   const scopeKeys = new Set([...investments.keys(), ...dataset.scopes.map((s) => s.sourceKey)]);
   for (const expectation of dataset.expectations) {
     const key = expectation.sourceKey;
+    if (expectation.historicalComponent !== undefined && (expectation.measure !== "historicalValue" || !["grossValue", "debt", "nav"].includes(expectation.historicalComponent))) add("invalid_expectation", key, "historicalComponent");
     if (!scopeKeys.has(expectation.scopeKey)) add("missing_scope", key);
     if (expectation.timing.asOfDate !== undefined) {
       date(expectation.timing.asOfDate, key, "asOfDate");
       if ("startDate" in expectation.timing || "endDate" in expectation.timing) add("invalid_expectation", key, "timing");
     }
     else {
+      if (expectation.measure === "historicalValue") add("invalid_expectation", key, "timing");
       date(expectation.timing.startDate, key, "startDate"); date(expectation.timing.endDate, key, "endDate");
       if (expectation.timing.startDate > expectation.timing.endDate) add("invalid_date", key, "timing");
     }

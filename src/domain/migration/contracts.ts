@@ -16,7 +16,7 @@ export type MoneyMeasure = "grossValue" | "debt" | "nav" | "contributions" | "di
 type ExpectedState<T> = { status: "available"; value: T } | { status: "missing" | "not_computable"; reason?: string; value?: never };
 export type SourceExpectation = SourceRecord & {
   scopeKey: string; timing: { asOfDate: string; startDate?: never; endDate?: never } | { startDate: string; endDate: string; asOfDate?: never };
-  sourceDefinitionTag?: string;
+  sourceDefinitionTag?: string; historicalComponent?: "grossValue" | "debt" | "nav";
 } & ( { measure: MoneyMeasure; expected: ExpectedState<string> } | { measure: "moic" | "xirr"; expected: ExpectedState<number> });
 export type MigrationDataset = {
   datasetId: string; records: MigrationRecord[];

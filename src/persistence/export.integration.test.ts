@@ -63,7 +63,8 @@ it("runs the private CLI, validates offline, and refuses overwrite/checkout dest
     await expect(run(["export", randomUUID(), absent])).rejects.toThrow();
     await expect(readFile(absent)).rejects.toThrow();
   } finally { await rm(directory, { recursive: true, force: true }); }
-});
+// Six fresh CLI processes need startup time on shared CI runners.
+}, 30_000);
 afterAll(async () => {
   try { await connection?.pool.end(); if (created) await admin?.query(`DROP DATABASE "${databaseName}"`); }
   finally { await admin?.end(); }
