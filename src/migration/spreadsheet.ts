@@ -104,7 +104,7 @@ export async function parseWorkbook(path: string, mapping: unknown): Promise<{ d
       const get = (ref: CellMapping | undefined) => ref ? "value" in ref ? ref.value : readCell(sheet.getCell(`${ref.column}${row}`)) : undefined;
       try {
         const key = get(section.key);
-        if (blank(key) && Object.values(section.fields).every(ref => "column" in ref && blank(sheet.getCell(`${ref.column}${row}`).value))) continue;
+        if (blank(key) && Object.values(section.fields).every(ref => !("column" in ref) || blank(sheet.getCell(`${ref.column}${row}`).value))) continue;
         if (typeof key !== "string" || !key.trim()) throw new CellError("unsupported_cell");
         sourceKey = key;
         const value = (name: string) => { field = name; return get(section.fields[name]); };
