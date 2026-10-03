@@ -35,10 +35,12 @@ test("browse and detail preserve value states, lifecycle and correction navigati
   await page.getByText("Filter by classification and ownership", { exact: true }).click();
   await page.getByLabel("Owner", { exact: true }).selectOption(choices.owners[0].id);
   await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page).toHaveURL(new RegExp("owner=" + choices.owners[0].id));
   await expect(row(funded)).toBeVisible();
   await page.getByLabel("Reporting date").focus();
   expect(await page.getByLabel("Reporting date").evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
-  expect((await page.getByRole("button", { name: "Apply filters" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect.poll(async () => (await page.getByRole("button", { name: "Apply filters" }).boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("investments.png"), fullPage: true });
   await page.goto("/investments/" + funded + "?date=2026-02-01&start=2024-01-01");
