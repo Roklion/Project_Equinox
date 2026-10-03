@@ -52,8 +52,9 @@ function InvestmentSelect({ id, label, value, onChange, options, errors, exclude
   );
 }
 
-export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnToUpdates = false }: {
+export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnToUpdates = false, returnToInvestment, launcherHref = "/add" }: {
   kind: Kind; initialInvestmentId?: string; initialDate?: string; returnToUpdates?: boolean;
+  returnToInvestment?: string; launcherHref?: string;
 }) {
   const router = useRouter();
   const saving = useRef(false);
@@ -78,6 +79,7 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
   const [savedDate, setSavedDate] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [selectionNotice, setSelectionNotice] = useState("");
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -104,6 +106,9 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
         setInvestments(body.investments);
         const nextContextInvestmentId = kind === "valuation" && contextInvestmentId &&
           body.investments.some((item) => item.id === contextInvestmentId) ? contextInvestmentId : "";
+        if (investmentId && !body.investments.some((item) => item.id === investmentId)) {
+          setSelectionNotice("The selected investment is unavailable on this date. Choose an eligible investment or change the date.");
+        }
         setInvestmentId((previous) => previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
         setDestinationInvestmentId((previous) =>
           previous && !body.investments.some((item) => item.id === previous) ? "" : previous);
@@ -118,7 +123,7 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [date, contextInvestmentId, kind, refresh]);
+  }, [date, contextInvestmentId, investmentId, kind, refresh]);
 
   let enteredNet: string | null = null;
   let enteredDelta: bigint | null = null;
@@ -187,7 +192,7 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
               setInvestmentId(""); setLoading(true); setContext(null); setLatest(null);
             }
           }}>Add another</button>
-          <Link prefetch={false} href={returnToUpdates ? "/updates?date=" + (initialDate ?? savedDate) : "/"}>{returnToUpdates ? "Return to Update Center" : "Overview"}</Link>
+          <Link prefetch={false} href={returnToInvestment ?? (returnToUpdates ? "/updates?date=" + (initialDate ?? savedDate) : "/")}>{returnToInvestment ? "Return to investment" : returnToUpdates ? "Return to Update Center" : "Overview"}</Link>
         </div>
       </section>
     );
@@ -215,7 +220,7 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
         <div className="transfer-pair">
           <InvestmentSelect id="sourceInvestmentId" label="Move value from" value={investmentId}
             onChange={(value) => {
-              setInvestmentId(value);
+              setSelectionNotice(""); setInvestmentId(value);
               if (value === destinationInvestmentId) setDestinationInvestmentId("");
             }}
             options={investments} errors={errors} />
@@ -226,11 +231,12 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
       ) : (
         <InvestmentSelect id="investmentId" label="Investment" value={investmentId}
           onChange={(value) => {
-            setInvestmentId(value);
+            setSelectionNotice(""); setInvestmentId(value);
             if (kind === "valuation") { setLoading(true); setContext(null); setLatest(null); }
           }}
           options={investments} errors={errors} />
       )}
+      {selectionNotice && <p className="entry-muted" role="status">{selectionNotice}</p>}
       {loading && <p className="entry-muted" role="status">Checking investments and date…</p>}
       {!loading && !loadError && !saveError && date && investments.length === 0 && (
         <p className="entry-muted">No investments are available on this date.</p>
@@ -335,7 +341,7 @@ export function EntryForm({ kind, initialInvestmentId = "", initialDate, returnT
             kind === "transfer" ? "Save transfer" : kind === "valuation" ? "Save valuation mark" :
               kind === "contribution" ? "Save contribution" : "Save withdrawal"}
         </button>
-        <Link href="/add">Choose another action</Link>
+        <Link href={launcherHref}>Choose another action</Link>
       </div>
     </form>
   );
