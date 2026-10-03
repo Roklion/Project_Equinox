@@ -6,6 +6,7 @@ import { runMigrationCli, type CliConnection } from "./cli";
 import { reservePrivateReport } from "./cli-report";
 import { readImportMapping, readManifest, readRules, countKeys } from "./cli-config";
 import { parseWorkbook, readWorkbookMapping } from "./spreadsheet";
+import { migrationInvestmentId } from "@/application/migration";
 import targetMapping from "./testing/synthetic-target-mapping.json";
 vi.mock("server-only", () => ({}));
 const id = "00000000-0000-4000-8000-000000000001";
@@ -103,11 +104,15 @@ it("retains private output and warns against retry when apply outcome is uncerta
 it("rejects duplicate manifest investment IDs before analytics and reports missing targets explicitly", async () => {
   const parsed = await parseWorkbook(resolve("src/migration/testing/synthetic.xlsx"), await readWorkbookMapping(resolve("src/migration/testing/synthetic-mapping.json")));
   const ids = Object.fromEntries(parsed.dataset!.records.map((r, i) => [r.sourceKey, `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`]));
+  for (const record of parsed.dataset!.records.filter(r => r.kind === "investment")) ids[record.sourceKey] = migrationInvestmentId(id, parsed.dataset!.datasetId, record.sourceKey);
   const manifest = { datasetId: parsed.dataset!.datasetId, householdId: id, ids, counts: Object.fromEntries(countKeys.map(k => [k, 0])) };
   const path = join(dir, "manifest.json");
   const invocation = [...args("reconcile"), "--manifest", path];
   await writeFile(path, JSON.stringify({ ...manifest, ids: { ...ids, "i-b": ids["i-a"] } }));
   const c = config();
+  expect(await runMigrationCli(invocation, c)).toBe(1);
+  expect(c.connect).not.toHaveBeenCalled();
+  await writeFile(path, JSON.stringify({ ...manifest, ids: { ...ids, "i-a": ids["i-b"], "i-b": ids["i-a"] } }));
   expect(await runMigrationCli(invocation, c)).toBe(1);
   expect(c.connect).not.toHaveBeenCalled();
   await writeFile(path, JSON.stringify(manifest));
