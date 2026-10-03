@@ -4,7 +4,8 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, expect, it, vi, type Mock } from "vitest";
 import { runMigrationCli, type CliConnection } from "./cli";
 import { reservePrivateReport } from "./cli-report";
-import { readImportMapping, readManifest, readRules } from "./cli-config";
+import { readImportMapping, readManifest, readRules, countKeys } from "./cli-config";
+import { parseWorkbook, readWorkbookMapping } from "./spreadsheet";
 import targetMapping from "./testing/synthetic-target-mapping.json";
 vi.mock("server-only", () => ({}));
 const id = "00000000-0000-4000-8000-000000000001";
@@ -86,4 +87,33 @@ it("adapter errors are reported before connecting or applying", async () => {
   const a = args("apply"); a[a.indexOf("--workbook") + 1] = join(dir, "absent.xlsx");
   const c = config(); expect(await runMigrationCli(a, c)).toBe(1); expect(c.connect).not.toHaveBeenCalled();
   expect(JSON.parse(await readFile(join(dir, "report.json"), "utf8"))).toEqual({ findings: [{ severity: "error", code: "workbook_unreadable" }] });
+});
+it("retains private output and warns against retry when apply outcome is uncertain", async () => {
+  expect(await runMigrationCli(args("apply"), config())).toBe(1);
+  expect(transaction).toHaveBeenCalledOnce();
+  expect(await readFile(join(dir, "report.json"), "utf8")).toBe("");
+  const output = log.mock.calls.flat().join("\n");
+  expect(output).toContain("apply_outcome_unknown");
+  expect(output).toContain("Do not apply again");
+  expect(output).not.toContain("no records were imported");
+  expect(output).not.toContain("unexpected_write");
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it("rejects duplicate manifest investment IDs before analytics and reports missing targets explicitly", async () => {
+  const parsed = await parseWorkbook(resolve("src/migration/testing/synthetic.xlsx"), await readWorkbookMapping(resolve("src/migration/testing/synthetic-mapping.json")));
+  const ids = Object.fromEntries(parsed.dataset!.records.map((r, i) => [r.sourceKey, `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`]));
+  const manifest = { datasetId: parsed.dataset!.datasetId, householdId: id, ids, counts: Object.fromEntries(countKeys.map(k => [k, 0])) };
+  const path = join(dir, "manifest.json");
+  const invocation = [...args("reconcile"), "--manifest", path];
+  await writeFile(path, JSON.stringify({ ...manifest, ids: { ...ids, "i-b": ids["i-a"] } }));
+  const c = config();
+  expect(await runMigrationCli(invocation, c)).toBe(1);
+  expect(c.connect).not.toHaveBeenCalled();
+  await writeFile(path, JSON.stringify(manifest));
+  catalog.mockResolvedValue({ exists: false, householdId: id, ownerIds: [id], classificationIds: {}, classifications: [], investments: [] });
+  expect(await runMigrationCli(invocation, config())).toBe(1);
+  expect(log.mock.calls.flat().join("\n")).toContain('"code":"target_missing"');
+  expect(log.mock.calls.flat().join("\n")).toContain("migration_preflight_failed");
+  expect(transaction).not.toHaveBeenCalled();
 });

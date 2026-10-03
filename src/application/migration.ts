@@ -7,7 +7,7 @@ import type { ImportCatalog, ImportInput, ImportPlan, ImportManifest, MigrationR
 
 export class MigrationError extends Error {
   constructor(public readonly code: "preflight_failed" | "read_failed" | "write_failed", public readonly findings: ImportFinding[] = []) {
-    super(code === "preflight_failed" ? "Migration preflight failed." : code === "read_failed" ? "Migration target could not be read." : "Migration transaction failed; no records were imported.");
+    super(code === "preflight_failed" ? "Migration preflight failed." : code === "read_failed" ? "Migration target could not be read." : "Migration transaction response failed; the commit outcome may be unknown. Inspect the target before retrying.");
   }
 }
 /** Stable opaque IDs prevent repeat creation without persisting a separate migration ledger. */
