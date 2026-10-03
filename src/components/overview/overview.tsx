@@ -5,6 +5,9 @@ import { InvestmentRow } from "@/components/financial/investment-row";
 import { HeadlineValue, MetricValue, PerformanceBreakdown, ReturnMetric, ValuationAge, ValueBreakdown } from "@/components/financial/primitives";
 import { formatDate, formatMoney } from "@/components/financial/format";
 import { overviewRanges, type OverviewRange } from "@/components/financial/reporting-context";
+import { SurfaceState } from "@/components/financial/primitives";
+import { ScopeControls } from "./scope-controls";
+import { scopeLabel, type ScopeSelection, type ScopeChoices } from "./reporting-scope";
 
 type Analytics = ReturnType<typeof createAnalyticsService>;
 export type OverviewData = {
@@ -13,22 +16,29 @@ export type OverviewData = {
   snapshot: Awaited<ReturnType<Analytics["snapshot"]>>;
   history: Awaited<ReturnType<Analytics["historicalSeries"]>>;
 };
-export function Overview({ data, range }: { data: OverviewData; range: OverviewRange }) {
+export function Overview({ data, range, selection = {}, choices }: {
+  data: OverviewData; range: OverviewRange; selection?: ScopeSelection; choices?: ScopeChoices;
+}) {
   const { returns, period, snapshot, history } = data;
   const date = snapshot.asOfDate;
   const nav = snapshot.totals.status === "available" ? { status: "available" as const, value: snapshot.totals.value.navCents } : snapshot.totals;
   const delta = period.change.status === "available" ? { status: "available" as const, value: period.change.value.navChangeCents } : period.change;
   const investments = [...snapshot.constituents].sort((a, b) => a.investment.name.localeCompare(b.investment.name) || a.investment.id.localeCompare(b.investment.id));
+  const scoped = Object.keys(selection).length > 0;
+  const label = choices ? scopeLabel(selection, choices) : "All tracked investments";
+  const resetHref = "/?" + new URLSearchParams({ date, range });
   return <div className="overview-page">
     <section className="page-heading"><p className="eyebrow">Your tracked investments</p><h1>Overview</h1>
+      <p className="overview-scope-label"><strong>Reporting scope</strong> · {label}</p>
       <HeadlineValue label="Aggregate investment NAV" result={nav} asOfDate={date} delta={delta} context={"since " + formatDate(period.startDate)} />
-      <p className="metric-context">Investment value across all tracked investments, including retained closed history.</p>
+      <p className="metric-context">Investment value across {scoped ? "the selected scope" : "all tracked investments"}, including retained closed history.</p>
+      {scoped && <Link href={resetHref}>Reset to All tracked investments</Link>}
       <div className="entry-actions"><Link className="primary-button" href="/add">Add financial entry</Link><Link href={"/updates?date=" + date}>Update valuations</Link></div>
     </section>
     <section className="overview-coverage" aria-label="Valuation coverage">
       <p><strong>{snapshot.coverage.valuedCount} of {snapshot.coverage.selectedCount} investments valued</strong>
         {snapshot.totals.status !== "available" && " · Incomplete valuation coverage"}</p>
-      {snapshot.totals.status !== "available" && <p>Aggregate value is unavailable until every tracked investment has a qualifying valuation. Available investments are shown individually.</p>}
+      {snapshot.totals.status !== "available" && <p>Aggregate value is unavailable until every investment in scope has a qualifying valuation. Available investments are shown individually.</p>}
       <details className="investment-disclosure"><summary>Actual valuation dates and coverage</summary>
         <ul className="coverage-list">{investments.map(({ investment, valuation }) => <li key={investment.id}>
           <Link href={"/investments/" + encodeURIComponent(investment.id) + "?date=" + date}>{investment.name}</Link>
@@ -38,12 +48,20 @@ export function Overview({ data, range }: { data: OverviewData; range: OverviewR
         </li>)}</ul>
       </details>
     </section>
-    <form className="investment-filters entry-form" action="/">
+    <form className="investment-filters entry-form" action="/" key={date + range + JSON.stringify(selection)}>
       <div className="entry-field"><label htmlFor="overview-date">Reporting date</label><input id="overview-date" name="date" type="date" defaultValue={date} required /></div>
       <div className="entry-field"><label htmlFor="overview-range">Performance period</label><select id="overview-range" name="range" defaultValue={range}>
         {Object.entries(overviewRanges).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-      </select></div><button className="primary-button" type="submit">Update overview</button>
+      </select></div>
+      {choices && <ScopeControls selection={selection} choices={choices} resetHref={resetHref} />}
+      <button className="primary-button" type="submit">Update overview</button>
     </form>
+    {!investments.length && <SurfaceState kind="empty" title={scoped ? "No investments in this reporting scope" : "Start your investment overview"}
+      action={scoped ? <Link href={resetHref}>Reset to All tracked investments</Link>
+        : <Link className="primary-button" href="/investments/new">Add investment</Link>}>
+      {scoped ? "Change or clear scope filters. Empty scope totals are zero; returns and historical observations are unavailable."
+        : "Create an investment, then record its contributions and valuation marks."}
+    </SurfaceState>}
     <p className="metric-context">Performance period sets the summary; each chart has its own history range.</p>
     <section className="metadata-section overview-period" aria-labelledby="period-heading"><h2 id="period-heading">Cash flow and investment performance</h2>
       <PerformanceBreakdown result={period.change} startDate={period.startDate} endDate={date} />
@@ -53,7 +71,7 @@ export function Overview({ data, range }: { data: OverviewData; range: OverviewR
         <div><dt>Recorded net external cash flow · USD</dt><dd>{formatMoney(period.cashFlows.netExternalCashFlowCents)}</dd></div>
       </dl>
       {period.change.status !== "available" && <p className="metric-context">Beginning or ending valuation coverage is incomplete. Recorded cash flows remain available; period performance cannot be calculated.</p>}
-      <p className="metric-context">Transfers between tracked investments cancel at this household boundary. Valuation observations are not cash flows.</p>
+      <p className="metric-context">Transfers with both investments in scope are internal. A transfer crossing this scope boundary is an inflow or outflow. Valuation observations are not cash flows.</p>
     </section>
 
     <ValueTrendChart series={history.valueSeries} allowMeasureSwitch />
@@ -77,9 +95,12 @@ export function Overview({ data, range }: { data: OverviewData; range: OverviewR
       </section>
     </div>
     <section className="metadata-section overview-investments" aria-labelledby="underlying-heading"><h2 id="underlying-heading">Underlying investments</h2>
-      <p className="metric-context">A preview of your tracked investments. Browse the full list for ownership, classifications, and lifecycle filters.</p>
+      <p className="metric-context">{investments.length} investments in this reporting scope. Detail links retain the reporting date.</p>
       <div className="investment-list">{investments.slice(0, 4).map((item) => <InvestmentRow key={item.investment.id} {...item} asOfDate={date} />)}</div>
-      <div className="entry-actions"><Link href={"/investments?date=" + date + "&lifecycle=all"}>View all investments ({investments.length})</Link></div>
+      {investments.length > 4 && <details className="investment-disclosure"><summary>Show remaining investments in scope ({investments.length - 4})</summary>
+        <div className="investment-list">{investments.slice(4).map((item) => <InvestmentRow key={item.investment.id} {...item} asOfDate={date} />)}</div>
+      </details>}
+      <div className="entry-actions"><Link href={"/investments?date=" + date + "&lifecycle=all"}>Browse all tracked investments</Link></div>
     </section>
   </div>;
 }

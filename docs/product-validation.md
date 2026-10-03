@@ -13,6 +13,7 @@ EPIC 4's final integration pass protects the personal household product on Deskt
 | Investment detail -> all four Add actions, date/source defaults, saved return context, global Add reset, invalid/closed defaults | e2e/action-context.spec.ts |
 | Active/closed filters, metadata filters, missing valuations and unavailable detail | e2e/investments.spec.ts |
 | Missing/stale/current valuation priority, closed-history exclusion, single/batch updates and fresh client-navigation returns | e2e/overview-updates.spec.ts |
+| Scoped Overview owner/joint-owner, overlapping-group, all classification and investment-set filters; intersections; scope retained across date, period and chart controls; local date resolution; reset; empty/missing/negative scopes and dated underlying links | e2e/scoped-overview.spec.ts; src/components/overview/scoped-analytics.test.ts checks authoritative metrics and histories against the compact synthetic ledger |
 | Real persisted chart values, dates, additive owner grouping and browser-local reporting dates | e2e/historical-charts.spec.ts |
 | Pointer selection, horizontal touch scrubbing, vertical page scrolling, keyboard date inspection, coverage gaps, negative segment rendering and color-independent labels | e2e/presentation/charts.spec.ts |
 | Landmarks, visible keyboard focus, touch targets, retained as-of dates, negative values, unavailable and presentation-only ambiguous return explanations | e2e/presentation/primitives.spec.ts |

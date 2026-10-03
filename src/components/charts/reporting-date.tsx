@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /** Share the browser-local calendar used by valuation entry with server reads. */
-export function ChartReportingDate({ serverDate, resolvePath, range }: { serverDate?: string; resolvePath?: "/" | "/updates"; range?: string }) {
+export function ChartReportingDate({ serverDate, resolvePath, range, scopeQuery }: { serverDate?: string; resolvePath?: "/" | "/updates"; range?: string; scopeQuery?: string }) {
   const router = useRouter();
   useEffect(() => {
     const now = new Date();
@@ -13,10 +13,11 @@ export function ChartReportingDate({ serverDate, resolvePath, range }: { serverD
       if (!resolvePath) router.refresh();
     }
     if (resolvePath) {
-      const params = new URLSearchParams({ date: localDate });
+      const params = new URLSearchParams(scopeQuery);
+      params.set("date", localDate);
       if (range) params.set("range", range);
       router.replace(resolvePath + "?" + params, { scroll: false });
     }
-  }, [router, serverDate, resolvePath, range]);
+  }, [router, serverDate, resolvePath, range, scopeQuery]);
   return null;
 }
