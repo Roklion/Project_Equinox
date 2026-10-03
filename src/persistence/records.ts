@@ -28,13 +28,13 @@ async function requireValidActivityDate(
 }
 
 /** Create an investment and all owner links together, with no ownerless committed row. */
-export async function createInvestment(db: Database, input: CreateInvestment) {
+export async function createInvestment(db: Database, input: CreateInvestment, canonicalId?: string) {
   const ownerIds = [...new Set(input.ownerIds)];
   if (ownerIds.length === 0) throw new Error("An investment needs an owner.");
   return db.transaction(async (tx) => {
     await validateInvestmentAssociations(tx, input);
     const [investment] = await tx.insert(investments).values({
-      householdId: input.householdId, name: input.name,
+      id: canonicalId, householdId: input.householdId, name: input.name,
       assetClassId: input.assetClassId, accountTypeId: input.accountTypeId,
       taxStatusId: input.taxStatusId, liquidityId: input.liquidityId, institutionId: input.institutionId,
     }).returning();

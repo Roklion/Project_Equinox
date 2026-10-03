@@ -63,3 +63,14 @@ describe("normalized migration preflight", () => {
     expect(validateMigration(dataset, ambiguous, target).map((r) => r.code)).toEqual(expect.arrayContaining(["unresolved_classification", "invalid_expectation"]));
   });
 });
+
+it("validates the component of historical expectations without changing the measure contract", () => {
+  const dataset = migrationFixture();
+  dataset.expectations[0] = {...dataset.expectations[0],measure:"historicalValue",historicalComponent:"debt",expected:{status:"available",value:"30.00"}};
+  expect(validate(dataset)).toEqual([]);
+  dataset.expectations[0].historicalComponent = "unsupported" as never;
+  expect(validate(dataset)).toContainEqual({code:"invalid_expectation",severity:"error",sourceKey:"nav-check",field:"historicalComponent"});
+  dataset.expectations[0].historicalComponent = "nav";
+  dataset.expectations[0].measure = "nav";
+  expect(validate(dataset)).toContainEqual({code:"invalid_expectation",severity:"error",sourceKey:"nav-check",field:"historicalComponent"});
+});

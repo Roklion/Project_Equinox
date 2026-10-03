@@ -20,3 +20,6 @@ Thumbs.db
 .equinox-backup.lock/
 *.backup
 *.sql.gz
+
+# Local private migration mappings only; workbooks/reports belong outside the checkout.
+/private-migration/

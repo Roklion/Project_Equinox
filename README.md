@@ -142,3 +142,7 @@ The app requires `DATABASE_URL` for PostgreSQL-backed failed-attempt throttling,
 ## Continuous integration
 
 GitHub Actions runs `npm ci`, lint, type checking, unit tests, a clean database migration, PostgreSQL integration tests, production build, and whitespace validation on pull requests and pushes to `main`. The workflow uses a disposable PostgreSQL service and synthetic test data; it needs no hosted database or deployment credentials.
+
+## Local migration tooling
+
+EPIC 5 now includes a configurable local XLSX adapter, read-only preflight, atomic canonical import service and analytics-based reconciliation, with synthetic fixtures and PostgreSQL rollback checks. See [migration and portability](docs/migration-and-portability.md) for mapping formats, target safety and private artifact handling. The composed private migration CLI and final EPIC regression/runbook remain separate #68/#70 work.

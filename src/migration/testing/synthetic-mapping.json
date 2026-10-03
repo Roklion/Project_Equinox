@@ -1,0 +1,12 @@
+{
+  "datasetId": "synthetic-migration-v1",
+  "sheets": [
+    {"sheet":"Example Holdings","firstRow":2,"lastRow":4,"kind":"investment","key":{"column":"A"},"fields":{"name":{"column":"B"},"ownerKeys":{"column":"C","separator":"|"},"assetClass":{"column":"D"},"customGroupKeys":{"column":"E","separator":"|"},"status":{"column":"F"},"closedOn":{"column":"G"}}},
+    {"sheet":"Example Flows","firstRow":2,"lastRow":4,"kind":"contribution","key":{"column":"A"},"fields":{"investmentKey":{"column":"B"},"effectiveDate":{"column":"C"},"amount":{"column":"D"}}},
+    {"sheet":"Example Flows","firstRow":5,"lastRow":6,"kind":"withdrawal","key":{"column":"A"},"fields":{"investmentKey":{"column":"B"},"effectiveDate":{"column":"C"},"amount":{"column":"D"}}},
+    {"sheet":"Example Moves","firstRow":2,"lastRow":2,"kind":"transfer","key":{"column":"A"},"fields":{"sourceInvestmentKey":{"column":"B"},"destinationInvestmentKey":{"column":"C"},"effectiveDate":{"column":"D"},"amount":{"column":"E"}}},
+    {"sheet":"Example Marks","firstRow":2,"lastRow":7,"kind":"valuation","key":{"column":"A"},"fields":{"investmentKey":{"column":"B"},"asOfDate":{"column":"C"},"grossValue":{"column":"D"},"debt":{"column":"E"}}},
+    {"sheet":"Example Controls","firstRow":2,"lastRow":10,"kind":"expectation","key":{"column":"A"},"fields":{"scopeKey":{"column":"B"},"asOfDate":{"column":"C"},"measure":{"column":"D"},"expected":{"column":"E"}}},
+    {"sheet":"Example Scope","firstRow":2,"lastRow":2,"kind":"scope","key":{"column":"A"},"fields":{"investmentKeys":{"column":"B","separator":"|"}}}
+  ]
+}

@@ -68,6 +68,7 @@ export function validateMigration(dataset: MigrationDataset, mapping: MigrationM
   const scopeKeys = new Set([...investments.keys(), ...dataset.scopes.map((s) => s.sourceKey)]);
   for (const expectation of dataset.expectations) {
     const key = expectation.sourceKey;
+    if (expectation.historicalComponent !== undefined && (expectation.measure !== "historicalValue" || !["grossValue", "debt", "nav"].includes(expectation.historicalComponent))) add("invalid_expectation", key, "historicalComponent");
     if (!scopeKeys.has(expectation.scopeKey)) add("missing_scope", key);
     if (expectation.timing.asOfDate !== undefined) {
       date(expectation.timing.asOfDate, key, "asOfDate");

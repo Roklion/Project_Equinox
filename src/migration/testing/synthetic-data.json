@@ -1,0 +1,45 @@
+{
+  "Example Holdings": [
+    ["Key","Name","Owners","Asset","Groups","Status","Closed on"],
+    ["i-a","Synthetic Amber","owner-a|owner-b","class-a","group-a","active",null],
+    ["i-b","Synthetic Birch","owner-b",null,null,"active",null],
+    ["i-c","Synthetic Cedar","owner-a","class-a",null,"closed","2026-01-01"]
+  ],
+  "Example Flows": [
+    ["Key","Investment","Date","Amount","Kind"],
+    ["c-a","i-a","2025-01-01",100,"contribution"],
+    ["c-b","i-b","2025-01-01","50.00","contribution"],
+    ["c-c","i-c","2025-01-01",10,"contribution"],
+    ["w-a","i-a","2025-07-01",20,"withdrawal"],
+    ["w-c","i-c","2026-01-01",12,"withdrawal"]
+  ],
+  "Example Moves": [
+    ["Key","From","To","Date","Amount"],
+    ["t-a","i-a","i-b","2025-08-01",5]
+  ],
+  "Example Marks": [
+    ["Key","Investment","Date","Gross","Debt"],
+    ["v-a0","i-a",45658,100,0],
+    ["v-b0","i-b","2025-01-01",50,0],
+    ["v-c0","i-c","2025-01-01",10,0],
+    ["v-a1","i-a","2026-01-01",90,0],
+    ["v-b1","i-b","2026-01-01",4,9],
+    ["v-c1","i-c","2026-01-01",0,0]
+  ],
+  "Example Controls": [
+    ["Key","Scope","Date","Measure","Value"],
+    ["e-gross","scope-all","2026-01-01","grossValue",94],
+    ["e-debt","scope-all","2026-01-01","debt",9],
+    ["e-nav","scope-all","2026-01-01","nav",null],
+    ["e-in","scope-all","2026-01-01","contributions",160],
+    ["e-out","scope-all","2026-01-01","distributions",32],
+    ["e-pnl","scope-all","2026-01-01","pnl",-43],
+    ["e-moic","scope-all","2026-01-01","moic",0.73125],
+    ["e-negative","i-b","2026-01-01","nav",-5],
+    ["e-history","scope-all","2025-01-01","historicalValue",160]
+  ],
+  "Example Scope": [
+    ["Key","Investments"],
+    ["scope-all","i-a|i-b|i-c"]
+  ]
+}

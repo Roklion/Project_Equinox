@@ -17,7 +17,7 @@ export default defineConfig([
             "@/application/**", "**/application/**",
             "@/persistence/**", "**/persistence/**",
             "next", "next/**", "react", "react-dom", "react-dom/**",
-            "pg", "pg/**", "drizzle-orm", "drizzle-orm/**",
+            "pg", "pg/**", "drizzle-orm", "drizzle-orm/**", "exceljs", "@/migration/spreadsheet", "**/migration/spreadsheet",
           ],
           message: "Domain rules must remain independent of presentation, workflows, and persistence.",
         }],
@@ -40,8 +40,19 @@ export default defineConfig([
     rules: {
       "no-restricted-imports": ["error", {
         patterns: [{
-          group: [...presentationImports, "@/persistence/**", "**/persistence/**", "pg", "pg/**", "drizzle-orm", "drizzle-orm/**"],
+          group: [...presentationImports, "@/persistence/**", "**/persistence/**", "pg", "pg/**", "drizzle-orm", "drizzle-orm/**", "exceljs", "@/migration/spreadsheet", "**/migration/spreadsheet"],
           message: "Application services use repository ports, not database adapters or SQL types.",
+        }],
+      }],
+    },
+  },
+  {
+    files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [{
+          group: ["exceljs", "exceljs/**", "@/migration/spreadsheet", "**/migration/spreadsheet"],
+          message: "Spreadsheet parsing is local tooling, outside ordinary runtime surfaces.",
         }],
       }],
     },
