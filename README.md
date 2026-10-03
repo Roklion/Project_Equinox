@@ -21,7 +21,7 @@ The application foundation uses Next.js App Router, React, and TypeScript in one
 
 The foundation includes a responsive shell, PostgreSQL tooling, password-only authentication, installable PWA metadata, canonical financial records, EPIC 2 entry/batch/history workflows, and authoritative EPIC 3 analytics. Responsive Investments/detail/management, household Overview summaries, and Update Center valuation maintenance consume those existing contracts. The four financial Add actions remain separate from investment creation. Overview integrates the merged interactive value-trend and composition charts, with a common reporting date and current asset-class composition. Offline financial-data behavior is intentionally deferred.
 
-EPIC 5 now has source-neutral migration contracts and a private, versioned canonical export command. See [migration and portability](docs/migration-and-portability.md) for the format, validation, command usage and remaining import/reconciliation boundaries.
+EPIC 5 provides a local spreadsheet adapter, preflight/atomic import, authoritative analytics reconciliation, and versioned canonical export. A synthetic PostgreSQL regression exercises the complete path with explicit owners, no source taxonomy and an intentionally ignored legacy grouping. See [migration and portability](docs/migration-and-portability.md) for contracts, commands, troubleshooting and the private operator runbook.
 
 ## Local setup
 
@@ -96,7 +96,7 @@ An existing standard PostgreSQL service is also supported: set `DATABASE_URL` to
 
 ## Hosted deployment
 
-See [hosted setup and verification](docs/hosted-deployment.md) for the Neon production branch, private Vercel configuration, migration order, synthetic connectivity check, and later migration roll-forward. Keep real financial data out of the hosted app until the authentication work in [Issue #17](https://github.com/Roklion/Project_Equinox/issues/17) is complete and verified.
+See [hosted setup and verification](docs/hosted-deployment.md) for the Neon production branch, private Vercel configuration, migration order, synthetic connectivity check, and migration roll-forward. Authentication is implemented; verify it on the actual deployment and establish recoverable backups before entering real financial data.
 
 ## Changing the schema
 

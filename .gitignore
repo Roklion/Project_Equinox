@@ -23,3 +23,6 @@ Thumbs.db
 
 # Private local migration inputs/reports; external private storage is preferred.
 /private-migration/
+# Explicit private-artifact suffixes also protect accidentally relocated copies.
+*.private.xlsx
+*.private.json
