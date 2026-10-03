@@ -53,6 +53,12 @@ Use the `@/` alias for imports rooted at `src`. Domain tests live beside their i
 
 The scaffold uses Next.js 16.3.6 and React 19.3. ESLint stays on 9 and TypeScript on 6.0 because the current Next.js lint plugins do not support ESLint 10 or TypeScript 7. Revisit these compatible tooling versions when the upstream plugins support newer majors.
 
+### Development dependency audit disposition
+
+A scoped override pins `@esbuild-kit/core-utils`' esbuild to 0.25.12 to address its development-server advisory without downgrading Drizzle Kit. Remove the override when stable Drizzle Kit removes or updates that dependency, after checking TypeScript transforms and migration generation.
+
+As of 2026-10-03, the Next.js lint chain's braces advisory has no patched release. Retain the compatible tooling with the finding visible: Equinox does not configure the plugin's `rootDir` glob setting or supply application data to it. Deeply nested patterns could still fail a developer/CI process if introduced into lint configuration. The repository maintainer owns rechecking before release and when upstream versions or glob usage change. [PR #87](https://github.com/Roklion/Project_Equinox/pull/87) records dependency paths, advisory links, audit counts and validation evidence for [issue #85](https://github.com/Roklion/Project_Equinox/issues/85).
+
 ## Environment configuration
 
 Use Next.js's built-in environment loading, including `@next/env` for the migration CLI and database test configuration. Local application configuration belongs in ignored `.env.local`; database tests use `.env.test.local` or shell variables. Shell variables take precedence. `.env.example` contains only explanatory comments and empty keys.
