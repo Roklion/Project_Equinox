@@ -8,6 +8,8 @@ import UpdateCenterPage from "./updates/page";
 import EntryPage from "./add/[kind]/page";
 import BatchPage from "./valuations/batch/page";
 import { optionalDate, overviewRange, periodStart } from "@/components/financial/reporting-context";
+import type { PageQuery } from "@/components/financial/reporting-context";
+import { ownerB, groupA, groupB } from "@/domain/analytics/testing/canonical-fixture";
 
 const mocks = vi.hoisted(() => ({ root: vi.fn() }));
 vi.mock("@/app/add/entry-data", () => ({ withAnalyticsService: mocks.root }));
@@ -16,9 +18,14 @@ let sources: CashFlowSources;
 beforeEach(() => {
   sources = canonicalSources();
   const analytics = createAnalyticsService({ getSnapshotSources: async () => sources, getCashFlowSources: async () => sources });
-  mocks.root.mockImplementation((run) => run({ householdId: "synthetic-household", analytics }));
+  const service = {
+    getInvestmentChoices: async () => ({ owners: [ownerB], customGroups: [groupA, groupB],
+      assetClasses: [{ id: "unused", label: "Unused class" }], accountTypes: [], taxStatuses: [], liquidities: [], institutions: [] }),
+    getInvestments: async () => sources.investments,
+  };
+  mocks.root.mockImplementation((run) => run({ householdId: "synthetic-household", analytics, service }));
 });
-const home = async (query = { date: endDate, range: "1y" }) => renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve(query) }));
+const home = async (query: PageQuery = { date: endDate, range: "1y" }) => renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve(query) }));
 const updates = async (query = { date: endDate }) => renderToStaticMarkup(await UpdateCenterPage({ searchParams: Promise.resolve(query) }));
 
 describe("household Overview", () => {
@@ -31,8 +38,9 @@ describe("household Overview", () => {
     expect(html).toContain("1.08×");
     expect(html).toContain("Decrease: ");
     expect(html).not.toMatch(/net worth|TWR/);
-    expect(html.match(/class="investment-row"/g)).toHaveLength(4);
-    expect(html).toContain("View all investments (5)");
+    expect(html.match(/class="investment-row"/g)).toHaveLength(5);
+    expect(html).toContain("Show remaining investments in scope (1)");
+    expect(html).toContain("All tracked investments");
     expect(html).toContain('dateTime="2022-01-01"');
     expect(html).toContain("Example market assets");
   });
@@ -95,6 +103,41 @@ describe("household Overview", () => {
     const html = renderToStaticMarkup(await HomePage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain("Using your local calendar date");
     expect(mocks.root).not.toHaveBeenCalled();
+  });
+  it("retries invalid dates via local today but retains valid dates on read failures, preserving scope and period", async () => {
+    const retryParams = (html: string) => new URL(html.match(/href="([^"]+)">Try again/)![1].replaceAll("&amp;", "&"), "https://example.test").searchParams;
+    const query = { date: "2026-02-30", range: "3m", owner: ownerB.id, group: [groupA.id, groupB.id] };
+    const invalid = retryParams(await home(query));
+    expect(invalid.has("date")).toBe(false);
+    expect(invalid.get("range")).toBe("3m");
+    expect(invalid.get("owner")).toBe(ownerB.id);
+    expect(invalid.getAll("group")).toEqual([groupA.id, groupB.id]);
+    mocks.root.mockRejectedValue(new Error("private-driver-error"));
+    const valid = retryParams(await home({ ...query, date: endDate }));
+    expect(valid.get("date")).toBe(endDate);
+    expect(valid.get("range")).toBe("3m");
+    expect(valid.get("owner")).toBe(ownerB.id);
+    expect(valid.getAll("group")).toEqual([groupA.id, groupB.id]);
+  });
+  it("routes the selected owner into metrics, histories, dated underlying links and checked controls", async () => {
+    const html = await home({ date: endDate, range: "1y", owner: ownerB.id });
+    expect(html).toContain("Owner: Owner B");
+    expect(html).toContain("$327.80");
+    expect(html).toContain("2 of 2 investments valued");
+    expect(html.match(/class="investment-row"/g)).toHaveLength(2);
+    expect(html).toContain('/investments/' + ids.active + '?date=' + endDate);
+    expect(html).toContain('name="owner" checked="" value="' + ownerB.id + '"');
+    expect(html).toContain("Reset to All tracked investments");
+    expect(html).not.toContain("$607.80");
+  });
+  it("retains scope controls and unavailable returns for an empty selection", async () => {
+    const html = await home({ date: endDate, range: "3m", assetClass: "unused" });
+    expect(html).toContain("Asset class: Unused class");
+    expect(html).toContain("No investments in this reporting scope");
+    expect(html).toContain("No contributions are recorded");
+    expect(html).toContain("No valuation observations in this range");
+    expect(html).toContain("Choose reporting scope");
+    expect(html).not.toContain("Start your investment overview");
   });
 });
 
