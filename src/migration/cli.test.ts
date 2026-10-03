@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { mkdtemp, readFile, writeFile, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -120,5 +121,25 @@ it("rejects duplicate manifest investment IDs before analytics and reports missi
   expect(await runMigrationCli(invocation, config())).toBe(1);
   expect(log.mock.calls.flat().join("\n")).toContain('"code":"target_missing"');
   expect(log.mock.calls.flat().join("\n")).toContain("migration_preflight_failed");
+  expect(transaction).not.toHaveBeenCalled();
+});
+it("uses importer own-property semantics for opaque inherited investment keys", async () => {
+  const workbook = new ExcelJS.Workbook(); await workbook.xlsx.readFile(resolve("src/migration/testing/synthetic.xlsx"));
+  workbook.eachSheet(sheet => sheet.eachRow(row => row.eachCell(cell => {
+    if (typeof cell.value === "string") cell.value = cell.value.replaceAll("i-a", "constructor");
+  })));
+  const workbookPath = join(dir, "inherited-key.xlsx"); await workbook.xlsx.writeFile(workbookPath);
+  const parsed = await parseWorkbook(workbookPath, await readWorkbookMapping(resolve("src/migration/testing/synthetic-mapping.json")));
+  expect(parsed.findings).toEqual([]);
+  const ids = Object.fromEntries(parsed.dataset!.records.map((r, i) => [r.sourceKey, r.kind === "investment" ? migrationInvestmentId(id, parsed.dataset!.datasetId, r.sourceKey) : `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`]));
+  await writeFile(join(dir, "manifest.json"), JSON.stringify({ datasetId: parsed.dataset!.datasetId, householdId: id, ids, counts: Object.fromEntries(countKeys.map(k => [k, 0])) }));
+  await writeFile(join(dir, "mapping.json"), JSON.stringify({ ...input.mapping, investments: {} }));
+  // Reaching target validation proves valid manifest identity was not rejected before connection.
+  catalog.mockResolvedValue({ exists: false, householdId: id, ownerIds: [id], classificationIds: {}, classifications: [], investments: [] });
+  const invocation = [...args("reconcile"), "--manifest", join(dir, "manifest.json")];
+  invocation[invocation.indexOf("--workbook") + 1] = workbookPath;
+  const c = config(); expect(await runMigrationCli(invocation, c)).toBe(1);
+  expect(c.connect).toHaveBeenCalledOnce();
+  expect(log.mock.calls.flat().join("\n")).toContain('"code":"target_missing"');
   expect(transaction).not.toHaveBeenCalled();
 });
