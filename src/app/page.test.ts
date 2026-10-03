@@ -104,6 +104,21 @@ describe("household Overview", () => {
     expect(html).toContain("Using your local calendar date");
     expect(mocks.root).not.toHaveBeenCalled();
   });
+  it("retries invalid dates via local today but retains valid dates on read failures, preserving scope and period", async () => {
+    const retryParams = (html: string) => new URL(html.match(/href="([^"]+)">Try again/)![1].replaceAll("&amp;", "&"), "https://example.test").searchParams;
+    const query = { date: "2026-02-30", range: "3m", owner: ownerB.id, group: [groupA.id, groupB.id] };
+    const invalid = retryParams(await home(query));
+    expect(invalid.has("date")).toBe(false);
+    expect(invalid.get("range")).toBe("3m");
+    expect(invalid.get("owner")).toBe(ownerB.id);
+    expect(invalid.getAll("group")).toEqual([groupA.id, groupB.id]);
+    mocks.root.mockRejectedValue(new Error("private-driver-error"));
+    const valid = retryParams(await home({ ...query, date: endDate }));
+    expect(valid.get("date")).toBe(endDate);
+    expect(valid.get("range")).toBe("3m");
+    expect(valid.get("owner")).toBe(ownerB.id);
+    expect(valid.getAll("group")).toEqual([groupA.id, groupB.id]);
+  });
   it("routes the selected owner into metrics, histories, dated underlying links and checked controls", async () => {
     const html = await home({ date: endDate, range: "1y", owner: ownerB.id });
     expect(html).toContain("Owner: Owner B");

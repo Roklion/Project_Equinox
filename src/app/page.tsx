@@ -14,8 +14,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const selection = scopeSelection(query);
   if (!singleParam(query.date)) return <LocalReportingDate pathname="/" range={range} scopeQuery={scopeParams(selection).toString()} />;
   let data;
+  let validatedDate: string | undefined;
   try {
     const date = optionalDate(query.date)!;
+    validatedDate = date;
     const start = periodStart(date, range);
     data = await withAnalyticsService(async ({ householdId, analytics, service }) => {
       const [overview, choices, investments] = await Promise.all([
@@ -26,7 +28,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     });
   } catch {
     const retry = new URLSearchParams(scopeParams(selection));
-    if (singleParam(query.date)) retry.set("date", singleParam(query.date)!);
+    if (validatedDate) retry.set("date", validatedDate);
     retry.set("range", range);
     return <><h1>Overview</h1><SurfaceState kind="error" title="Overview could not be loaded" action={<Link href={"/?" + retry}>Try again</Link>}>
       Check the reporting date and try again. Your records have not changed.</SurfaceState></>;
