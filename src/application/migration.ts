@@ -15,13 +15,17 @@ export function migrationInvestmentId(householdId: string, datasetId: string, so
   const hex = createHash("sha256").update(JSON.stringify(["equinox-migration-v1", householdId, datasetId, sourceKey])).digest("hex");
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-5${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
 }
+function mappedInvestment(input: ImportInput, sourceKey: string): string | null | undefined {
+  const mapping = input.mapping.investments;
+  return mapping && Object.hasOwn(mapping, sourceKey) ? mapping[sourceKey] : undefined;
+}
 function investmentRecords(input: ImportInput) {
   return input.dataset.records.filter((r): r is MigrationInvestment => r.kind === "investment").sort((a,b) => compare(a.sourceKey,b.sourceKey));
 }
 function classificationRequests(input: ImportInput) {
   const requests: Array<{ dimension: ClassificationDimension; key: string; sourceKey: string }> = [];
   for (const investment of investmentRecords(input)) {
-    if (input.mapping.investments?.[investment.sourceKey]) continue;
+    if (mappedInvestment(input, investment.sourceKey)) continue;
     for (const [dimension,key] of Object.entries(investment.classifications)) requests.push({ dimension: dimension as ClassificationDimension, key, sourceKey: investment.sourceKey });
     for (const key of investment.customGroupKeys) requests.push({ dimension: "customGroup", key, sourceKey: investment.sourceKey });
   }
@@ -35,7 +39,7 @@ export function planMigration(input: ImportInput, catalog: ImportCatalog): Impor
   const counts = { investments: 0, existingInvestments: 0, classifications: 0, contributions: 0, withdrawals: 0, transfers: 0, valuations: 0, closures: 0 };
   const mappedIds = new Set<string>();
   for (const record of investmentRecords(input)) {
-    const mapped = mapping.investments && Object.hasOwn(mapping.investments, record.sourceKey) ? mapping.investments[record.sourceKey] : undefined;
+    const mapped = mappedInvestment(input, record.sourceKey);
     if (catalog.investments.length && mapped === undefined) add("explicit_investment_mapping_required", record.sourceKey);
     const id = mapped ?? migrationInvestmentId(mapping.householdId, dataset.datasetId, record.sourceKey);
     const existing = catalog.investments.find(i => i.id === id);
@@ -94,7 +98,7 @@ export function createMigrationService(repository: MigrationRepository) {
             if (!catalog.classifications.some(c => c.id === id)) catalog.classifications.push({id, dimension: request.dimension,label: target.normalizedLabel!});
           }
           for (const record of investmentRecords(input)) {
-            const existing = mapping.investments?.[record.sourceKey];
+            const existing = mappedInvestment(input, record.sourceKey);
             const id = existing ?? migrationInvestmentId(mapping.householdId,dataset.datasetId,record.sourceKey);
             if (!existing) {
               const metadata: CreateInvestment = { householdId: mapping.householdId, name: record.name, ownerIds: record.ownerKeys.map(k => mapping.owners[k]), groupIds: record.customGroupKeys.map(k => lookupIds.get(JSON.stringify(["customGroup",k]))!) };
@@ -117,7 +121,7 @@ export function createMigrationService(repository: MigrationRepository) {
             }
           }
           for (const record of records) if (record.kind === "valuation") ids[record.sourceKey] = (await session.portfolio.recordValuationMark({ householdId: mapping.householdId, investmentId: ids[record.investmentKey], asOfDate: record.asOfDate, grossValue: record.grossValue, debt: record.debt, source: "import" })).id;
-          for (const record of investmentRecords(input)) if (record.status === "closed" && !mapping.investments?.[record.sourceKey]) await session.portfolio.closeInvestment(mapping.householdId,ids[record.sourceKey],record.closedOn!);
+          for (const record of investmentRecords(input)) if (record.status === "closed" && !mappedInvestment(input, record.sourceKey)) await session.portfolio.closeInvestment(mapping.householdId,ids[record.sourceKey],record.closedOn!);
           return { datasetId: dataset.datasetId, householdId: mapping.householdId, ids, counts: plan.counts };
         });
       } catch (error) { if (error instanceof MigrationError) throw error; throw new MigrationError("write_failed"); }

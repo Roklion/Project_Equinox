@@ -99,3 +99,20 @@ it("requires explicit mapping in populated targets and permits a compatible empt
   const [unchanged] = await db.select().from(investments).where(eq(investments.id,existing.id));
   expect(unchanged.name).toBe("Synthetic preconfigured");
 });
+
+it("resolves only explicit investment mappings for opaque source keys", async () => {
+  input.mapping.investments = {};
+  const originalKey = "a";
+  const sourceKey = "constructor";
+  for (const record of input.dataset.records) {
+    if (record.sourceKey === originalKey) record.sourceKey = sourceKey;
+    if ("investmentKey" in record && record.investmentKey === originalKey) record.investmentKey = sourceKey;
+    if (record.kind === "transfer" && record.sourceInvestmentKey === originalKey) record.sourceInvestmentKey = sourceKey;
+  }
+  input.dataset.scopes[0].investmentKeys[0] = sourceKey;
+  expect((await service().preflight(input)).findings).toEqual([]);
+  const manifest = await service().apply(input);
+  expect(typeof manifest.ids[sourceKey]).toBe("string");
+  expect(await counts()).toEqual([3,6,7,6,4,1,1,1]);
+  await expect(service().apply(input)).rejects.toThrow("preflight failed");
+});
