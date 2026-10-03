@@ -5,7 +5,7 @@ import { assertCalendarDate, formatCents, parseCents } from "@/domain/financial"
 import type { MigrationDataset, MigrationRecord, SourceExpectation } from "@/domain/migration/contracts";
 import { compare } from "@/domain/migration/validate";
 
-export type CellMapping = { column: string; separator?: string } | { value: string | number | null };
+export type CellMapping = { column: string; separator?: string } | { value: string | number | null; separator?: string };
 export type SheetMapping = {
   sheet: string; firstRow: number; lastRow: number; key: CellMapping;
   kind: MigrationRecord["kind"] | "scope" | "expectation";
@@ -75,9 +75,9 @@ function validateMapping(value: unknown): value is WorkbookMapping {
   const ref = (v: unknown): boolean => {
     if (!v || typeof v !== "object" || Array.isArray(v)) return false;
     const cell = v as Partial<{column:string;separator:string;value:unknown}>;
+    if (Object.hasOwn(cell,"separator") && (typeof cell.separator !== "string" || !cell.separator)) return false;
     if (Object.hasOwn(cell,"column")) {
-      return !Object.hasOwn(cell,"value") && typeof cell.column === "string" && /^[A-Z]{1,3}$/.test(cell.column)
-        && (!Object.hasOwn(cell,"separator") || typeof cell.separator === "string" && !!cell.separator);
+      return !Object.hasOwn(cell,"value") && typeof cell.column === "string" && /^[A-Z]{1,3}$/.test(cell.column);
     }
     return Object.hasOwn(cell,"value") && (cell.value === null || typeof cell.value === "string" || typeof cell.value === "number" && Number.isFinite(cell.value));
   };
@@ -104,7 +104,7 @@ export async function parseWorkbook(path: string, mapping: unknown): Promise<{ d
       const get = (ref: CellMapping | undefined) => ref ? "value" in ref ? ref.value : readCell(sheet.getCell(`${ref.column}${row}`)) : undefined;
       try {
         const key = get(section.key);
-        if (blank(key) && Object.values(section.fields).every(ref => "column" in ref && blank(sheet.getCell(`${ref.column}${row}`).value))) continue;
+        if (blank(key) && Object.values(section.fields).every(ref => !("column" in ref) || blank(sheet.getCell(`${ref.column}${row}`).value))) continue;
         if (typeof key !== "string" || !key.trim()) throw new CellError("unsupported_cell");
         sourceKey = key;
         const value = (name: string) => { field = name; return get(section.fields[name]); };
@@ -114,7 +114,7 @@ export async function parseWorkbook(path: string, mapping: unknown): Promise<{ d
         };
         const list = (name: string, optional = false) => {
           const raw = text(name,optional); if (raw === undefined) return [];
-          const ref = section.fields[name]; const separator = ref && "column" in ref ? ref.separator : undefined;
+          const separator = section.fields[name]?.separator;
           const values = separator ? raw.split(separator) : [raw];
           if (values.some(v => !v.trim())) throw new CellError("unsupported_cell"); return values;
         };

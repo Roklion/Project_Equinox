@@ -22,7 +22,7 @@ Each document owns a distinct contract; other documentation links to it rather t
 
 The app includes password authentication, first-run household setup, Settings for owners/classifications, investment management, financial entry/correction/history, household and scoped Overview analytics, historical charts and valuation maintenance. Investment creation is separate from the four financial Add actions. The installable experience is online-only.
 
-Local migration libraries support XLSX parsing, preflight, atomic import and reconciliation; a separate command exports canonical JSON. The composed private migration CLI and operator runbook remain [#68](https://github.com/Roklion/Project_Equinox/issues/68)/[#70](https://github.com/Roklion/Project_Equinox/issues/70) work, not commands available in this checkout.
+The private migration CLI supports XLSX inspection, preflight, atomic import and analytics reconciliation; a separate command exports canonical JSON. The [operator runbook](docs/migration-and-portability.md#real-migration-operating-sequence) covers target setup, rehearsal, backup, apply, reconciliation and private artifact retention. Optional classifications may remain absent; no taxonomy is inferred from legacy grouping.
 
 ## Local setup
 
@@ -60,6 +60,7 @@ Open [localhost:3000](http://localhost:3000), sign in, and complete household se
 | `npm run db:seed` | Seed an empty local household database with synthetic records |
 | `npm run db:verify` | Check connectivity with a temporary synthetic read/write |
 | `npm run db:reset` | **Delete the Compose volume**, restart and migrate |
+| `npm run data:migrate -- …` | Run the private XLSX migration workflow; [usage](docs/migration-and-portability.md#private-migration-cli) |
 | `npm run data:export -- …` | Export/validate private canonical JSON; [usage](docs/migration-and-portability.md#private-local-command) |
 
 ## Local PostgreSQL

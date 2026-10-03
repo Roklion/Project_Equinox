@@ -114,3 +114,27 @@ it("rejects a historical-value mapping that supplies a range instead of a date p
   expect(result.dataset).toBeNull();
   expect(result.findings).toContainEqual({severity:"error",code:"invalid_date",sourceKey:"e-gross",field:"timing"});
 });
+
+it("skips blank spacer and trailing rows with literal defaults, while rejecting partial rows without keys", async () => {
+  const directory = await mkdtemp(join(tmpdir(),"equinox-adapter-test-"));
+  try {
+    const workbook = new ExcelJS.Workbook(); await workbook.xlsx.readFile(fixture);
+    const sheet = workbook.getWorksheet("Example Marks")!;
+    sheet.insertRow(3, []);
+    const path = join(directory,"synthetic.xlsx"); await workbook.xlsx.writeFile(path);
+    const mapping = await readWorkbookMapping(config);
+    const section = mapping.sheets.find(s => s.kind === "valuation")!;
+    section.lastRow = 9;
+    section.fields.debt = {value:0};
+    mapping.sheets = [section];
+    const result = await parseWorkbook(path,mapping);
+    expect(result.findings).toEqual([]);
+    expect(result.dataset!.records.map(r => r.sourceKey)).toEqual(["v-a0","v-b0","v-c0","v-a1","v-b1","v-c1"]);
+    expect(result.dataset!.records.every(r => r.kind === "valuation" && r.debt === "0.00")).toBe(true);
+    sheet.getCell("A2").value = null;
+    await workbook.xlsx.writeFile(path);
+    const partial = await parseWorkbook(path,mapping);
+    expect(partial.dataset).toBeNull();
+    expect(partial.findings).toContainEqual({severity:"error",code:"unsupported_cell",field:"sourceKey"});
+  } finally {await rm(directory,{recursive:true,force:true});}
+});

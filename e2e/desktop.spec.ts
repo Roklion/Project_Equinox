@@ -127,10 +127,11 @@ test("batch failure is atomic, keeps inputs, and requires explicit replacement",
 
 test("a late batch conflict refreshes retained debt before correction", async ({ page, context }) => {
   await page.goto("/valuations/batch");
+  await expect(page.getByText("Loading investments and marks…")).toBeHidden();
   await page.getByLabel("Shared as-of date").fill("2026-04-12");
+  await expect(page.getByText("Loading investments and marks…")).toBeHidden();
   const market = batchRow(page, "Sample Market Account");
   await market.getByLabel("Gross value").fill("1100.00");
-  await expect(page.getByText("Loading investments and marks…")).toBeHidden();
 
   const otherTab = await context.newPage();
   await otherTab.goto("/add/valuation");

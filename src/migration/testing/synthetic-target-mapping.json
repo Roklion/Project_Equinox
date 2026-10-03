@@ -1,0 +1,11 @@
+{
+  "householdId": "00000000-0000-4000-8000-000000000001",
+  "owners": {
+    "owner-a": "00000000-0000-4000-8000-000000000002",
+    "owner-b": "00000000-0000-4000-8000-000000000003"
+  },
+  "classifications": {
+    "assetClass": { "class-a": { "normalizedLabel": "Synthetic Asset" } },
+    "customGroup": { "group-a": { "normalizedLabel": "Synthetic Group" } }
+  }
+}

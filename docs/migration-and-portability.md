@@ -1,10 +1,10 @@
 # Migration contracts and canonical portability
 
-This document owns EPIC 5's source-neutral boundary and portable format. Financial rules remain owned by [the data model](data-model.md) and [metrics](metrics.md); [architecture](architecture.md) owns dependency direction. Neither capability depends on a private workbook or the EPIC 4 UI. First-run setup (#61) is an operator prerequisite for a future import into a zero-household target, not for these contracts. Database backups remain a separate [operational capability](backup-and-restore.md).
+This document owns EPIC 5's source-neutral boundary and portable format. Financial rules remain owned by [the data model](data-model.md) and [metrics](metrics.md); [architecture](architecture.md) owns dependency direction. Neither capability depends on a private workbook or the EPIC 4 UI. First-run setup (#61) is an operator prerequisite for an import into a zero-household target, not for these contracts. Database backups remain a separate [operational capability](backup-and-restore.md).
 
 ## Source-neutral migration boundary
 
-`src/domain/migration/contracts.ts` defines normalized adapter records; `validateMigration` returns deterministic, presentation-neutral findings. It performs no database reads or writes. The spreadsheet adapter (#65), atomic import/preflight (#66), reconciliation (#67), and future private CLI (#68) consume this boundary rather than introducing workbook concepts into canonical entities or analytics.
+`src/domain/migration/contracts.ts` defines normalized adapter records; `validateMigration` returns deterministic, presentation-neutral findings. It performs no database reads or writes. The spreadsheet adapter (#65), atomic import/preflight (#66), reconciliation (#67), and private CLI (#68) consume this boundary rather than introducing workbook concepts into canonical entities or analytics.
 
 A dataset has a stable `datasetId`, `records`, declared `scopes`, and `expectations`. Every record, scope, and expectation carries an opaque `sourceKey` and `sourceKind`, optionally `safeReference`. Keys are unique across the entire dataset. Adapters must issue deterministic keys stable across repeated parsing of the same dataset, with no private labels, file paths, filenames, account identifiers or raw row contents embedded in them. Workbook positions/formulas may be tracked privately by an adapter but are not canonical record fields. Safe references are local diagnostic hints only; they never enter default findings/logs or analytics. Dataset IDs plus source keys provide provenance for later private manifests; no general audit/versioning subsystem is introduced.
 
@@ -56,13 +56,13 @@ Use an explicit canonical household UUID; the command never picks the first hous
 
 Terminal success output includes only destination and entity counts, or a validation-success message. Failures use a fixed diagnostic message without driver errors, private paths, labels, money or source contents. There is no browser download interface in this ticket.
 
-**Real exports are private artifacts, comparable to the source workbook.** Store them outside every public checkout in a private, access-controlled location. Do not commit, attach to issues/PRs, snapshot or log them. Handle destination paths privately too. Automated tests and public examples use invented data only. An export is a user-data portability format; use the backup runbook for database recovery and take a current backup before a later real import. The export command is independent of the local migration/reconciliation capabilities below; EPIC 5's composed CLI and final end-to-end runbook remain separate tasks.
+**Real exports are private artifacts, comparable to the source workbook.** Store them outside every public checkout in a private, access-controlled location. Do not commit, attach to issues/PRs, snapshot or log them. Handle destination paths privately too. Automated tests and public examples use invented data only. An export is a user-data portability format; use the backup runbook for database recovery and take a current backup before a later real import. The export command is independent of the local migration/reconciliation capabilities below. The private migration CLI, operating sequence and EPIC-wide regression are documented below.
 
 ## Local spreadsheet adapter (#65)
 
 `src/migration/spreadsheet.ts` owns XLSX details. `parseWorkbook(absolutePath, workbookMapping)` uses the development-only ExcelJS library; no ordinary application/domain code imports it. The adapter does not calculate formulas, query the database, pair transfers heuristically, or invent marks. Only explicitly mapped rows are read. It returns `{ dataset, findings }`; any error makes `dataset` null so a partial workbook cannot be imported. Missing formula caches in optional source expectations produce warnings and explicit `not_computable` states while the financial dataset remains usable.
 
-`readWorkbookMapping(absolutePath)` reads a local JSON configuration. `WorkbookMapping` names each sheet, an inclusive `firstRow`/`lastRow` range, a record kind, an explicit source-key cell, and field mappings. A field is `{ column: "A" }` or a literal `{ value: "active" }`. A column mapping may declare a `separator` for owner/group/scope lists; no delimiter is guessed. Investment fields are `name`, `ownerKeys`, optional classification-dimension keys, optional `customGroupKeys`, `status`, and optional `closedOn`. Flows, transfers and marks use the normalized contract's field names. A valuation's debt must be mapped explicitly (including a literal zero when the source has no linked debt). A blank optional classification stays absent; a blank monetary value is never converted to zero. Field names must be supported by the mapped record kind; unknown or misspelled names fail with `invalid_mapping` before workbook parsing, so intended optional metadata cannot be silently omitted.
+`readWorkbookMapping(absolutePath)` reads a local JSON configuration. `WorkbookMapping` names each sheet, an inclusive `firstRow`/`lastRow` range, a record kind, an explicit source-key cell, and field mappings. A field is `{ column: "A" }` or a literal `{ value: "active" }`. A column or literal mapping may declare a `separator` for owner/group/scope lists; no delimiter is guessed. Investment fields are `name`, `ownerKeys`, optional classification-dimension keys, optional `customGroupKeys`, `status`, and optional `closedOn`. Flows, transfers and marks use the normalized contract's field names. A valuation's debt must be mapped explicitly (including a literal zero when the source has no linked debt). A blank optional classification stays absent; a blank monetary value is never converted to zero. Field names must be supported by the mapped record kind; unknown or misspelled names fail with `invalid_mapping` before workbook parsing, so intended optional metadata cannot be silently omitted.
 
 Expectation mappings provide `scopeKey`, `measure`, date timing, `expected`, optional `state`, `sourceDefinitionTag`, and `historicalComponent`. Missing source values remain `missing`; explicit states can be `missing` or `not_computable`. Available ratio/rate cells must be numeric decimal rates (for example 0.1 for 10%, with no text-percent guessing). Money accepts exact decimal text or finite numeric cells with no fractional-cent rounding. Values beyond the safe numeric cent boundary must be stored as decimal text. Currency symbols, separators, localized date strings, timestamps, booleans, rich-text/error cells and ambiguous values are rejected. Dates accept validated ISO calendar text, integral Excel serial dates in the workbook's 1900/1904 epoch, and date cells at UTC midnight. Fractional days and Excel's fictional serial day 60 are rejected for serial inputs.
 
@@ -74,7 +74,7 @@ Keep real workbooks, mappings, manifests, annotations and reports outside every 
 
 ## Preflight and atomic import (#66)
 
-`createMigrationService(MigrationRepository)` in `src/application/migration.ts` owns `preflight({ dataset, mapping })` and `apply({ dataset, mapping })`. `createPostgresMigrationRepository` implements its application-owned transaction/catalog port. Adapters and future CLI composition call the service, never ad-hoc SQL. Configure the intended existing household UUID and explicit household owner IDs; imports do not create households or owners. Take a current [backup](backup-and-restore.md) before any real apply. The local CLI is a separate #68 task.
+`createMigrationService(MigrationRepository)` in `src/application/migration.ts` owns `preflight({ dataset, mapping })` and `apply({ dataset, mapping })`. `createPostgresMigrationRepository` implements its application-owned transaction/catalog port. Adapters and CLI composition call the service, never ad-hoc SQL. Configure the intended existing household UUID and explicit household owner IDs; imports do not create households or owners. Take a current [backup](backup-and-restore.md) before any real apply. The local CLI is documented below.
 
 Preflight reads a household-scoped catalog without mutation, runs the normalized validator, and reports all supported conflicts in lexical source-key/code/field order. Its plan includes dataset/household IDs and counts for new/existing investments, new classification/group lookups, contributions, withdrawals, transfers, valuations and new closures. Exact normalized classification labels are reused within their dimension; multiple exact matches are blocking rather than selecting an arbitrary ID. Stable explicitly mapped lookup IDs take priority. Owners remain a many-to-many set with no percentages.
 
@@ -104,4 +104,107 @@ Historical expectations are individual requested calendar points. `historicalCom
 
 Statuses are `match`, `source_unavailable`, `equinox_unavailable`, `mapping_mismatch`, `definition_mismatch`, and `numeric_difference`. Available money mismatches identify mapping/source discrepancies; unexplained floating-point mismatches require numerical investigation. Missing/not-computable source states and incomplete/unavailable canonical states remain explicit. A source `not_computable` state with the same explicit reason as an unavailable canonical result matches that state; a source numeric zero never matches an unavailable return.
 
-Local rules explicitly pair `sourceDefinitionTag` and measure with an explanation code/note; duplicate rules are rejected. A matching annotation classifies a known definition difference as `definition_mismatch` while preserving both raw results and any delta. It never changes a formula, edits a result, or turns a disagreement into equality. Synthetic tests independently specify exact and one-cent results, transfer cancellation, negative NAV, missing coverage, valid/unavailable returns, definition annotations and a single historical-date mismatch. The final CLI/report and EPIC-wide end-to-end runbook remain #68/#70 responsibilities.
+Local rules explicitly pair `sourceDefinitionTag` and measure with an explanation code/note; duplicate rules are rejected. A matching annotation classifies a known definition difference as `definition_mismatch` while preserving both raw results and any delta. It never changes a formula, edits a result, or turns a disagreement into equality. Synthetic tests independently specify exact and one-cent results, transfer cancellation, negative NAV, missing coverage, valid/unavailable returns, definition annotations and a single historical-date mismatch. Before querying analytics, the CLI verifies every manifest investment ID against its explicit target mapping or the stable household/dataset/source-key ID used by the importer, so swapped recovered identities fail closed. The CLI/report, real-migration operating sequence and final EPIC-wide regression are documented below.
+
+## Private migration CLI (#68)
+
+Run from the checkout root with Node/npm and development dependencies installed. `npm run data:migrate --` composes the existing XLSX adapter, application preflight/atomic importer and analytics reconciliation. It has no web route or ordinary app behavior. Every file argument must be an absolute path; quote paths containing spaces. Adapter JSON follows #65 above. Target mapping JSON follows `ImportMapping`; the public `src/migration/testing/synthetic-target-mapping.json` is an invented template whose household/owner UUIDs must be replaced locally. Unknown target-mapping fields fail rather than being ignored. Optional annotations are a JSON array of the #67 rules.
+
+Database commands read **only the shell's `MIGRATION_DATABASE_URL`**. They never load `.env.local` or fall back to `DATABASE_URL` or `TEST_DATABASE_URL`. Set it explicitly for each intended target, using private local configuration; do not put a credential-bearing URL on the command line or in version control. Inspection requires no database. Household and owners must already exist; use first-run setup/settings when starting with an empty target (#61).
+
+```sh
+npm run data:migrate -- inspect --workbook /private/source.xlsx --adapter /private/adapter.json --output /private/inspection.json
+npm run data:migrate -- preflight --workbook /private/source.xlsx --adapter /private/adapter.json --mapping /private/target.json --output /private/preflight.json
+npm run data:migrate -- apply --workbook /private/source.xlsx --adapter /private/adapter.json --mapping /private/target.json --backup-confirmed --output /private/manifest.json
+npm run data:migrate -- reconcile --workbook /private/source.xlsx --adapter /private/adapter.json --mapping /private/target.json --manifest /private/manifest.json --output /private/reconciliation.json
+```
+
+Windows paths such as `C:\PrivateEquinox\source.xlsx` are supported. Add `--annotations /private/annotations.json` to reconciliation when documented definition differences apply. There is no implicit apply or full-sequence command. `apply` and the operator's `--backup-confirmed` acknowledgement are both required for writes. The acknowledgement records an operator prerequisite, not an automated backup verification. Apply runs preflight, aborts on any blocking finding, and the existing importer repeats preflight within its atomic transaction.
+
+Reports are required and created exclusively: the parent directory must already exist, and an existing destination is never overwritten. The CLI resolves parent-directory symlinks and rejects output in the checkout except `/private-migration/`, which Git explicitly ignores. Prefer an external, access-controlled private folder for **all** workbooks, mappings, annotations, inspection/preflight reports, manifests and reconciliation reports. Inputs can use public synthetic fixtures for rehearsal/testing; real inputs must follow the private convention. If using the ignored convenience directory, keep every real input/output there and verify Git ignores it. It supports all migration artifacts, not just mapping files. POSIX reports use mode 0600; on Windows, provision private folder ACLs yourself. The CLI does not create private directories or manage retention.
+
+Inspection reports include normalized records and adapter findings. Preflight reports include counts and blocking findings plus adapter warnings. Successful apply produces the exact source-key manifest consumed by reconciliation. A blocked apply saves its preflight findings instead of a manifest. Reconciliation JSON retains raw source/Equinox values, deltas, statuses and annotations. All reports may contain real financial data and identities: never commit, snapshot, log, or attach them to GitHub. Terminal output includes only counts, opaque source keys and structured codes; CLI diagnostics omit file paths, credential URLs, raw rows, values and annotation notes. npm may echo the command arguments, so use opaque private filenames and avoid capturing the command line in shared logs.
+
+Exit codes are 0 for successful inspection/preflight/apply or all-matching reconciliation, 1 for blocked/failed commands, and 2 for a completed reconciliation with comparisons requiring review (including known definition differences and unavailable results). Inspect the report rather than treating a nonzero reconciliation exit as a database-write failure. Adapter errors prevent all target operations. No expectations means zero comparisons; that success is not evidence of financial agreement. Preflight does not predict source-versus-analytics agreement before import.
+
+The output file is reserved before connecting/applying so missing directories, existing files and ordinary permission failures prevent mutation. If writing/syncing the manifest fails **after commit**, the CLI reports `apply_committed_report_failed`, retains any incomplete file and does not claim rollback. Do not rerun apply: inspect the target and recover canonical investment IDs through the importer's stable household/dataset/source-key identities (and action/mark IDs through canonical history), or restore the pre-apply backup before a controlled retry. Database and file writes cannot share a transaction. Preserve original dataset/source identities through all retries. Commands known to fail before applying remove only their own incomplete report; a cleanup diagnostic asks the operator to remove it if necessary. If an apply transaction response fails, its commit outcome may be unknown even though PostgreSQL transactions remain atomic. The CLI retains the reserved private output and warns against reapplying. Inspect the target using stable dataset/source identities, recover the manifest if committed, or restore the verified backup before retrying; never infer rollback from a lost response.
+
+### Source history and target taxonomy
+
+The workbook is authoritative for the historical financial records being migrated. It need not represent Equinox's full domain: category/type/tag fields and owner columns are not prerequisites. Omit absent optional classification and custom-group fields from the adapter mapping and use `"classifications": {}` in the target mapping. Ignore an obsolete legacy grouping by leaving its column unmapped. Do not map it to a custom group merely to retain it, or infer classifications from investment names or free-form text. A supplied classification key without a target mapping is an error; deliberate omission is different.
+
+Configure household/owners first through authenticated setup and Settings. Obtain their canonical IDs privately from the target database console using read-only queries:
+
+```sql
+SELECT id, name FROM households;
+SELECT id, name, household_id FROM owners ORDER BY name;
+```
+
+Verify the intended household and each owner's household association. Put those IDs only in the private target mapping's `householdId` and `owners` fields. No real query results belong in GitHub or this repository.
+
+When the workbook has no ownership column, split investment sections into explicit row ranges by configured owner set, with a literal mapping such as:
+
+```json
+{
+  "sheet": "Example Holdings",
+  "firstRow": 2,
+  "lastRow": 2,
+  "kind": "investment",
+  "key": { "column": "A" },
+  "fields": {
+    "name": { "column": "B" },
+    "ownerKeys": { "value": "owner-a|owner-b", "separator": "|" },
+    "status": { "column": "D" },
+    "closedOn": { "column": "E" }
+  }
+}
+```
+
+This synthetic example intentionally ignores column C (obsolete grouping). Resolve `owner-a` and `owner-b` explicitly in the target mapping; the two owners are associations, not allocation percentages. Inspect the resulting records after any source row insertion/reordering, because row ranges are positional. Source keys must remain stable.
+
+Imported investments may remain unclassified. Later, create classification/custom-group values in Settings and assign them through investment Manage/Edit. Those normal workflows preserve financial history; do not rerun import to add taxonomy. Existing-ID import selections retain the existing investment's metadata and owner associations, so review those separately.
+
+### Real migration operating sequence
+
+1. Use the intended release revision with Node 24/npm 11 and `npm ci` (development dependencies are required by the local XLSX CLI). Before changing an existing target schema, take a recoverable backup. Apply committed schema migrations using the explicit target `DATABASE_URL` and `npm run db:migrate`; verify [hosted configuration and authentication](hosted-deployment.md) before real data. Prepare the target household/owners and private mapping as above. Keep the original workbook unchanged; recalculate/save cached formula values in its source application if needed. Confirm source keys and dataset identity are stable and contain no private labels or account identifiers.
+2. Before production apply, ensure a current recoverable database backup exists using the [backup runbook](backup-and-restore.md). Verify its target and retention yourself; `--backup-confirmed` attests this operator step. The CLI neither implements #15 nor couples migration to NAS tooling.
+3. Run inspect and preflight locally. Resolve every blocking finding and investigate adapter warnings. Keep JSON reports private. Review the explicit target household and all proposed creations/existing-ID selections.
+4. Rehearse against a disposable/local database with the same schema and household/owner setup before the first real migration. The [local setup](../README.md#local-postgresql) commands provide PostgreSQL; use a separate empty database, migrate it, and initialize its household through the app without demo seeding. Explicitly set `MIGRATION_DATABASE_URL` to the rehearsal database and adapt canonical mapping IDs for that target. Apply and reconcile; investigate unexplained discrepancies and document intentional definition differences as annotations. Do not reuse a rehearsal manifest against another target.
+5. Once preflight and reconciliation expectations are understood, explicitly configure the intended production target and its mapping, verify the backup, rerun preflight into a new report and run apply with `--backup-confirmed`. No automatic promotion or target fallback occurs.
+6. Retain the resulting target manifest and rerun reconciliation against that target. Review every non-match, including unavailable results; annotations explain differences without hiding values or changing formulas. A second apply is unsupported and should fail safely.
+7. Export the imported household using the [canonical export command](#private-local-command), then run its offline validation. Explicitly set `DATABASE_URL` to the same verified target: export does **not** read `MIGRATION_DATABASE_URL`. Choose a new absolute output path outside the checkout. The export preserves canonical history but cannot replace the recovery backup.
+8. Retain the original source, mapping, successful manifest, reviewed reconciliation and validated export securely for as long as needed to explain/recover the migration. Archive the pre-apply backup outside the backup job's rolling-retention folder. Remove redundant working copies and incomplete artifacts when no longer needed; keep terminal captures, database-console results and backup/restore logs private too. Verify `git status --short` before every commit.
+
+### Interpreting reconciliation and troubleshooting
+
+Inspect raw values and states in the private JSON report; an exit code alone is insufficient. A complete source control set should include household and investment gross/debt/NAV, contributions/distributions, P&L, historical points and definitionally comparable returns. Zero comparisons is not migration acceptance. Review every non-match, and preserve the accepted explanation with the report.
+
+| Finding/status | Operator action |
+| --- | --- |
+| `invalid_mapping`, `missing_sheet`, `unsupported_cell` | Check exact field names, sheet/range/column selections, literal values and list separators. Do not silently drop financial records to clear a finding. |
+| `invalid_money`, `invalid_date` | Supply exact decimal money and unambiguous calendar dates; remove display currency/separator strings and timestamps. Correct the private source/mapping without rounding cents. |
+| `formula_value_unavailable` | Recalculate/save the workbook in its source application or explicitly accept the unavailable source control; Equinox cannot calculate workbook formulas. |
+| `target_missing`, `wrong_household`, `unresolved_owner` | Verify the explicit database, household and configured owner IDs. Rehearsal IDs are not production IDs. |
+| `unresolved_classification`, `ambiguous_classification` | Explicitly resolve a supplied taxonomy key; use a canonical ID for ambiguous labels. Omit fields genuinely absent/obsolete in the source instead of inventing classifications. |
+| `duplicate_source_key`, `duplicate_valuation`, `same_transfer_investment`, `invalid_lifecycle` | Correct the source mapping/history; ensure one mark per investment/date, distinct transfer endpoints and no activity after closure. |
+| `explicit_investment_mapping_required`, `target_investment_missing` | Select an existing compatible empty-history investment ID or explicit `null` creation for every source investment in a populated target. Never match names heuristically. |
+| `existing_history`, `investment_collision` | Stop and inspect prior applies/target history. Re-import/overwrite is unsupported; do not change dataset/source IDs to bypass the protection. |
+| `migration_command_failed` | Check arguments, absolute private paths, new output filename, mapping shape, shell target configuration, connectivity and permissions. The generic diagnostic intentionally omits sensitive driver details. |
+| `apply_committed_report_failed` | Database commit succeeded. Preserve the incomplete output and use the recovery guidance above; never blindly retry apply. |
+| `match` | Comparable raw values agree within the documented policy, or the explicitly unavailable states agree. It does not certify source completeness. |
+| `source_unavailable` | Source control is missing/not computable; obtain it or document why that comparison cannot be accepted numerically. |
+| `equinox_unavailable` | Review valuation coverage or return eligibility; missing is not zero. |
+| `mapping_mismatch`, `numeric_difference` | Investigate identities, dates, boundary inclusion, exact source amounts and return definitions. A one-cent money mismatch is not rounding tolerance. |
+| `definition_mismatch` | Review the retained raw results and explanation. Approve an intentional definition difference explicitly; do not force canonical formulas to reproduce a source approximation. |
+
+For example, the synthetic legacy control computes gross-value change as 94 - 160 = -66, while canonical P&L is NAV 85 + distributions 32 - contributions 160 = -43. A private annotation with `sourceDefinitionTag: "legacy-value-change"`, `measure: "pnl"` and `code: "ignores-external-flows"` identifies this intentional difference; reconciliation retains the +23 delta. Closed Cedar's 10 contribution and 12 final distribution one year later independently establish MOIC 1.2 and XIRR 0.2. These are invented controls, not examples derived from a private portfolio.
+
+### Synthetic regression and privacy gate (#70)
+
+`src/migration/testing/legacy-workbook.ts` generates a temporary XLSX from the existing synthetic financial matrix, with a taxonomy-free holdings sheet, an ignored obsolete grouping, operator-configured owners and a 5.01 transfer. No workbook owner/category/type/tag fields are required. It supplements the original adapter fixture that exercises optional classification mapping.
+
+`src/migration/end-to-end.integration.test.ts` runs inspection, non-mutating preflight, atomic apply, canonical queries/analytics, reconciliation and validated portability export in a freshly migrated disposable PostgreSQL database. It asserts exact cents/dates, joint ownership, empty classification/group data, paired-transfer cancellation, debt/negative NAV, closed returns, historical carry-forward, missing coverage, source-missing and annotated definition differences, valuation uniqueness, repeat rejection and exclusion of populated authentication state. Run it through `npm run test:db`; CI already includes that command. Unit tests never require a real workbook.
+
+Prefer external private storage. The ignored `/private-migration/` directory covers every local input/report, while `*.private.xlsx` and `*.private.json` protect explicitly named private copies moved elsewhere. Backup patterns remain ignored. The unit privacy gate checks the documented ignore behavior and rejects tracked paths matching those conventions, including force-added files. It does not classify arbitrary financial contents or certify all repository history. Never add a real artifact even under a generic filename.
+
+Passing this suite establishes the synthetic migration path. Production readiness additionally requires merged/reviewed dependencies, release checks, hosted authentication verification, a recoverable backup and successful private rehearsal/reconciliation on the intended target; it is not established merely by closing the final epic ticket.

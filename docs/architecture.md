@@ -35,7 +35,7 @@ As of 2026-10-03, the Next.js lint chain's braces advisory has no patched releas
 
 ## Environment configuration
 
-Use Next.js environment loading, including `@next/env` for local commands and database tests. Application configuration belongs in ignored `.env.local`; tests use `.env.test.local` or shell variables and never load `.env.local`. Shell variables take precedence. [Local setup](../README.md#local-setup) owns installation and secret-generation commands.
+Use Next.js environment loading, including `@next/env` for schema migration/export commands and database tests. The private data-migration CLI is separate: it reads only the shell's `MIGRATION_DATABASE_URL`, never environment files or application/test database fallbacks. Application configuration belongs in ignored `.env.local`; tests use `.env.test.local` or shell variables and never load `.env.local`. Shell variables take precedence. [Local setup](../README.md#local-setup) owns installation and secret-generation commands.
 
 `DATABASE_URL` is required for database operations and authenticated requests, but not production builds or public sign-in/static routes. Validate it as a PostgreSQL URL with a host and explicit database without including its value in errors. `POSTGRES_PASSWORD` configures local Compose; `TEST_DATABASE_URL` is a separate maintenance connection and never falls back to `DATABASE_URL`.
 
@@ -49,7 +49,7 @@ Never import secrets into client/domain code or put secrets in `NEXT_PUBLIC_` va
 
 `src/persistence/schema.ts` defines financial and separate authentication tables. `src/persistence/migrate.ts` applies committed SQL with Drizzle's journal and transactions, shared by the CLI and integration tests. Migrations are explicit deployment steps, never rendering/build side effects. Applied migrations are immutable; use forward migrations and never schema push in production. [The schema workflow](../README.md#changing-the-schema) owns generation/application commands.
 
-`db:verify` checks connectivity with a synthetic read/write in a transaction-local temporary table; it is not financial workflow validation. The migration CLI may report driver error messages/codes, so keep operational output private. Idle-pool logs use a fixed message.
+`db:verify` checks connectivity with a synthetic read/write in a transaction-local temporary table; it is not financial workflow validation. The schema migration CLI may report driver error messages/codes, so keep operational output private. Idle-pool logs use a fixed message.
 
 Docker Compose provides PostgreSQL bound to loopback port 5433 with a managed volume. [Local PostgreSQL](../README.md#local-postgresql) owns setup and reset instructions. [Backup and restore](backup-and-restore.md) owns dumps, retention and disposable recovery tests.
 
@@ -101,7 +101,7 @@ Authenticated pages and financial composition roots resolve this state through t
 
 ExcelJS is a development-only dependency used by `src/migration`; ordinary application/domain/runtime code cannot import the XLSX adapter. Application-owned migration and analytics ports keep import/reconciliation independent of workbook layout. Imports reuse canonical persistence functions, with an explicit investment ID where required, without another ledger/schema/browser workflow.
 
-[Migration and portability](migration-and-portability.md) owns normalized records, mappings, export, target safety and reconciliation. The composed private CLI and operator runbook are tracked in [#68](https://github.com/Roklion/Project_Equinox/issues/68) and [#70](https://github.com/Roklion/Project_Equinox/issues/70); they are not present in this checkout.
+[Migration and portability](migration-and-portability.md) owns normalized records, mappings, export, target safety and reconciliation. `scripts/migrate-private.ts` composes the local workflow through `src/migration/cli.ts`. Target selection uses only `MIGRATION_DATABASE_URL`; JSON parsing and private report-file handling remain local tooling concerns. Financial validation and writes stay in the existing services. The [operator runbook](migration-and-portability.md#real-migration-operating-sequence) owns rehearsal, backup, explicit apply and uncertain-outcome recovery.
 
 ## Validation strategy
 
