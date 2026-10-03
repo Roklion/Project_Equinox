@@ -80,7 +80,7 @@ it("rolls back classifications, links and financial writes when a late database 
   await db.execute(sql`ALTER TABLE valuation_marks ADD CONSTRAINT synthetic_late_failure CHECK (gross_value <> 4) NOT VALID`);
   try {
     expect((await service().preflight(input)).findings).toEqual([]);
-    await expect(service().apply(input)).rejects.toThrow("Migration transaction failed; no records were imported.");
+    await expect(service().apply(input)).rejects.toThrow("Migration transaction response failed; the commit outcome may be unknown. Inspect the target before retrying.");
     expect(await counts()).toEqual([0,0,0,0,0,0,0,0]);
   } finally {await db.execute(sql`ALTER TABLE valuation_marks DROP CONSTRAINT synthetic_late_failure`);}
   expect((await service().apply(input)).counts.valuations).toBe(6);

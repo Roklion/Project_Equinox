@@ -7,7 +7,7 @@ import type { ImportCatalog, ImportInput, ImportPlan, ImportManifest, MigrationR
 
 export class MigrationError extends Error {
   constructor(public readonly code: "preflight_failed" | "read_failed" | "write_failed", public readonly findings: ImportFinding[] = []) {
-    super(code === "preflight_failed" ? "Migration preflight failed." : code === "read_failed" ? "Migration target could not be read." : "Migration transaction failed; no records were imported.");
+    super(code === "preflight_failed" ? "Migration preflight failed." : code === "read_failed" ? "Migration target could not be read." : "Migration transaction response failed; the commit outcome may be unknown. Inspect the target before retrying.");
   }
 }
 /** Stable opaque IDs prevent repeat creation without persisting a separate migration ledger. */
@@ -15,7 +15,7 @@ export function migrationInvestmentId(householdId: string, datasetId: string, so
   const hex = createHash("sha256").update(JSON.stringify(["equinox-migration-v1", householdId, datasetId, sourceKey])).digest("hex");
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-5${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
 }
-function mappedInvestment(input: ImportInput, sourceKey: string): string | null | undefined {
+export function mappedInvestment(input: ImportInput, sourceKey: string): string | null | undefined {
   const mapping = input.mapping.investments;
   return mapping && Object.hasOwn(mapping, sourceKey) ? mapping[sourceKey] : undefined;
 }
