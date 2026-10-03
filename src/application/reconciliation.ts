@@ -34,6 +34,7 @@ export function createReconciliationService(repository: AnalyticsRepository) {
       const records: ReconciliationRecord[] = [];
       for (const expectation of [...dataset.expectations].sort((a,b) => compare(a.sourceKey,b.sourceKey))) {
         const {timing,measure} = expectation;
+        if (measure === "historicalValue" && (timing.asOfDate === undefined || timing.startDate !== undefined || timing.endDate !== undefined)) throw new Error("Historical expectations require a single as-of date.");
         const endDate = timing.asOfDate ?? timing.endDate;
         assertCalendarDate(endDate);
         if (timing.startDate !== undefined) { assertCalendarDate(timing.startDate); if (timing.startDate > endDate) throw new Error("Invalid reconciliation period."); }
