@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { validateMigration, classificationDimensions, compare } from "@/domain/migration/validate";
-import type { ClassificationDimension } from "@/domain/investment";
+import { normalizeInvestmentName, type ClassificationDimension } from "@/domain/investment";
 import type { MigrationInvestment } from "@/domain/migration/contracts";
 import type { CreateInvestment } from "./ports";
 import type { ImportCatalog, ImportInput, ImportPlan, ImportManifest, MigrationRepository, ImportFinding } from "./migration-ports";
@@ -101,7 +101,7 @@ export function createMigrationService(repository: MigrationRepository) {
             const existing = mappedInvestment(input, record.sourceKey);
             const id = existing ?? migrationInvestmentId(mapping.householdId,dataset.datasetId,record.sourceKey);
             if (!existing) {
-              const metadata: CreateInvestment = { householdId: mapping.householdId, name: record.name, ownerIds: record.ownerKeys.map(k => mapping.owners[k]), groupIds: record.customGroupKeys.map(k => lookupIds.get(JSON.stringify(["customGroup",k]))!) };
+              const metadata: CreateInvestment = { householdId: mapping.householdId, name: normalizeInvestmentName(record.name), ownerIds: record.ownerKeys.map(k => mapping.owners[k]), groupIds: record.customGroupKeys.map(k => lookupIds.get(JSON.stringify(["customGroup",k]))!) };
               for (const dimension of classificationDimensions) {
                 if (dimension === "customGroup") continue;
                 const key = record.classifications[dimension];

@@ -101,3 +101,16 @@ it("rejects unknown mapping fields instead of silently omitting intended metadat
       .toEqual({dataset: null, findings: [{severity: "error", code: "invalid_mapping"}]});
   }
 });
+
+it("rejects a historical-value mapping that supplies a range instead of a date point", async () => {
+  const mapping = await readWorkbookMapping(config);
+  const section = mapping.sheets.find(s => s.kind === "expectation")!;
+  section.lastRow = section.firstRow;
+  section.fields.measure = {value:"historicalValue"};
+  delete section.fields.asOfDate;
+  section.fields.startDate = {value:"2025-01-01"};
+  section.fields.endDate = {value:"2026-01-01"};
+  const result = await parseWorkbook(fixture,mapping);
+  expect(result.dataset).toBeNull();
+  expect(result.findings).toContainEqual({severity:"error",code:"invalid_date",sourceKey:"e-gross",field:"timing"});
+});

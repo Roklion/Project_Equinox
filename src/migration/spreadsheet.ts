@@ -140,6 +140,7 @@ export async function parseWorkbook(path: string, mapping: unknown): Promise<{ d
             const scopeKey = text("scopeKey")!; const measure = text("measure")!; const sourceDefinitionTag = text("sourceDefinitionTag",true);
             if (!["grossValue","debt","nav","contributions","distributions","pnl","historicalValue","moic","xirr"].includes(measure)) throw new CellError("unsupported_cell");
             const timing = section.fields.asOfDate ? {asOfDate:date("asOfDate")} : {startDate:date("startDate"),endDate:date("endDate")};
+            if (measure === "historicalValue" && !("asOfDate" in timing)) { field = "timing"; throw new CellError("invalid_date"); }
             let expected: SourceExpectation["expected"];
             try {
               const state = text("state",true) ?? "available";
