@@ -60,6 +60,15 @@ export function normalizeWorkbookMoney(value: unknown, signed = false, aggregate
   const [whole,fraction = ""] = absolute.split(".");
   return formatCents((BigInt(whole) * 100n + BigInt(fraction.padEnd(2,"0"))) * (negative ? -1n : 1n));
 }
+const mappedFields: Record<SheetMapping["kind"], readonly string[]> = {
+  investment: ["name", "ownerKeys", "assetClass", "accountType", "taxStatus", "liquidity", "institution", "customGroupKeys", "status", "closedOn"],
+  contribution: ["investmentKey", "effectiveDate", "amount"],
+  withdrawal: ["investmentKey", "effectiveDate", "amount"],
+  transfer: ["sourceInvestmentKey", "destinationInvestmentKey", "effectiveDate", "amount"],
+  valuation: ["investmentKey", "asOfDate", "grossValue", "debt"],
+  scope: ["investmentKeys"],
+  expectation: ["scopeKey", "measure", "asOfDate", "startDate", "endDate", "expected", "state", "sourceDefinitionTag", "historicalComponent"],
+};
 function validateMapping(value: unknown): value is WorkbookMapping {
   if (!value || typeof value !== "object") return false;
   const m = value as WorkbookMapping;
@@ -74,7 +83,7 @@ function validateMapping(value: unknown): value is WorkbookMapping {
   };
   return typeof m.datasetId === "string" && !!m.datasetId.trim() && Array.isArray(m.sheets) && m.sheets.every(s =>
     s && typeof s.sheet === "string" && !!s.sheet && Number.isInteger(s.firstRow) && s.firstRow >= 1 && Number.isInteger(s.lastRow) && s.lastRow >= s.firstRow &&
-    ["investment","contribution","withdrawal","transfer","valuation","scope","expectation"].includes(s.kind) && ref(s.key) && s.fields && typeof s.fields === "object" && Object.values(s.fields).every(ref) && (s.kind !== "expectation" || (s.fields.asOfDate
+    ["investment","contribution","withdrawal","transfer","valuation","scope","expectation"].includes(s.kind) && ref(s.key) && s.fields && typeof s.fields === "object" && !Array.isArray(s.fields) && Object.entries(s.fields).every(([name, value]) => mappedFields[s.kind].includes(name) && ref(value)) && (s.kind !== "expectation" || (s.fields.asOfDate
       ? !s.fields.startDate && !s.fields.endDate
       : !!s.fields.startDate && !!s.fields.endDate)));
 }

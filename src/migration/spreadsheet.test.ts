@@ -86,3 +86,18 @@ it("classifies an unusable cached formula as not comparable and rejects ambiguou
     expect((await parseWorkbook(path,mapping)).findings).toEqual([{severity:"error",code:"invalid_mapping"}]);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
+
+it("rejects unknown mapping fields instead of silently omitting intended metadata", async () => {
+  for (const field of ["assetClass", "customGroupKeys"]) {
+    const mapping = await readWorkbookMapping(config);
+    const investment = mapping.sheets.find(s => s.kind === "investment")!;
+    investment.fields[field + "Typo"] = investment.fields[field];
+    delete investment.fields[field];
+    expect(await parseWorkbook(fixture, mapping)).toEqual({dataset: null, findings: [{severity: "error", code: "invalid_mapping"}]});
+  }
+  const mapping = await readWorkbookMapping(config);
+  for (const section of mapping.sheets) {
+    expect(await parseWorkbook(fixture, {...mapping, sheets: [{...section, fields: {...section.fields, unsupported: {value: "synthetic"}}}]}))
+      .toEqual({dataset: null, findings: [{severity: "error", code: "invalid_mapping"}]});
+  }
+});
