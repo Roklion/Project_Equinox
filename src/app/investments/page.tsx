@@ -5,7 +5,9 @@ import { withAnalyticsService } from "@/app/add/entry-data";
 import { ChartReportingDate } from "@/components/charts/reporting-date";
 import { InvestmentRow } from "@/components/financial/investment-row";
 import { SurfaceState } from "@/components/financial/primitives";
-import { browseChoices, browseInvestments, reportingDate, type BrowseQuery } from "@/components/financial/investment-browse";
+import { browseInvestments, reportingDate, type BrowseQuery } from "@/components/financial/investment-browse";
+
+import { InvestmentBrowseFilters } from "@/components/financial/investment-browse-filters";
 
 export const metadata: Metadata = { title: "Investments | Equinox" };
 export const dynamic = "force-dynamic";
@@ -30,20 +32,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams: 
   return <>{dateSync}<section className="page-heading"><p className="eyebrow">Your tracked investments</p><h1>Investments</h1>
     <p className="introduction">Current value, valuation freshness, and the details behind each investment.</p>
     <Link className="primary-button" href="/investments/new">Add investment</Link></section>
-    <form className="investment-filters entry-form" action="/investments">
-      <div className="entry-field"><label htmlFor="report-date">Reporting date</label>
-        <input id="report-date" type="date" name="date" defaultValue={snapshot?.asOfDate ?? reportingDate()} required /></div>
-      <div className="entry-field"><label htmlFor="lifecycle">Investments to show</label>
-        <select id="lifecycle" name="lifecycle" defaultValue={query.lifecycle ?? "active"}>
-          <option value="active">Active investments</option><option value="closed">Closed investments</option><option value="all">Active and closed</option>
-        </select></div>
-      <details className="investment-filter-details"><summary>Filter by classification and ownership</summary><div className="investment-filter-options">
-      {([["assetClass", "Asset class"], ["institution", "Institution"], ["owner", "Owner"], ["group", "Custom group"]] as const).map(([key, label]) =>
-        <div className="entry-field" key={key}><label htmlFor={key}>{label}</label><select id={key} name={key} defaultValue={query[key] ?? ""}>
-          <option value="">All</option>{browseChoices(items, key).map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}
-        </select></div>)}</div></details>
-      <div className="entry-actions"><button className="primary-button" type="submit">Apply filters</button><Link href="/investments">Reset filters</Link></div>
-    </form>
+    <InvestmentBrowseFilters items={items} query={query} date={snapshot?.asOfDate ?? reportingDate()} />
     {!items.length ? <SurfaceState kind="empty" title="No investments available">Create an investment after household owners are configured.</SurfaceState>
       : !visible.length ? <SurfaceState kind="empty" title="No investments match these filters">Change the filters or include closed investments.</SurfaceState>
       : <div className="investment-list">{visible.map(({ investment, valuation }) => <InvestmentRow key={investment.id}

@@ -104,3 +104,26 @@ describe("live investment surface composition", () => {
     expect(html).not.toContain("private-driver-error");
   });
 });
+
+it("renders every metadata filter and preserves selected IDs and reporting context", async () => {
+  const data = sources();
+  const active = data.investments[0];
+  active.classifications.accountType = { id: "account-id", label: "Example account" };
+  active.classifications.taxStatus = { id: "tax-id", label: "Example tax status" };
+  active.classifications.liquidity = { id: "liquidity-id", label: "Example liquidity" };
+  const snapshot = await createAnalyticsService({ getSnapshotSources: async () => data, getCashFlowSources: async () => data }).snapshot("synthetic-household", endDate);
+  mocked.root.mockResolvedValue(snapshot);
+  const html = renderToStaticMarkup(await InvestmentsPage({ searchParams: Promise.resolve({ date: endDate, lifecycle: "all",
+    accountType: "account-id", taxStatus: "tax-id", liquidity: "liquidity-id" }) }));
+  for (const id of ["account-id", "tax-id", "liquidity-id"]) expect(html).toContain('value="' + id + '" selected=""');
+  for (const key of ["assetClass", "accountType", "taxStatus", "liquidity", "institution", "owner", "group"]) expect(html).toContain('name="' + key + '"');
+  expect(html).toContain('class="investment-filter-details" open=""');
+  expect(html).toContain('/investments?date=' + endDate + '&amp;lifecycle=all');
+  expect(html).toContain("Active example");
+  expect(html).not.toContain("Negative equity example");
+  const unknown = renderToStaticMarkup(await InvestmentsPage({ searchParams: Promise.resolve({ date: endDate, accountType: "removed-id" }) }));
+  expect(unknown).toContain('value="removed-id" selected=""');
+  expect(unknown).toContain("No investments match these filters");
+  const repeated = renderToStaticMarkup(await InvestmentsPage({ searchParams: Promise.resolve({ date: endDate, accountType: ["account-id", "other-id"] }) }));
+  expect(repeated).toContain("Negative equity example");
+});

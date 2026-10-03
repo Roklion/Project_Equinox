@@ -19,8 +19,8 @@ export async function withEntryService<T>(
 }
 
 export async function withAnalyticsService<T>(
-  run: (context: { householdId: string; analytics: ReturnType<typeof createAnalyticsService> }) => Promise<T>,
+  run: (context: { householdId: string; analytics: ReturnType<typeof createAnalyticsService>; service: ReturnType<typeof createPortfolioService> }) => Promise<T>,
 ): Promise<T | null> {
-  return withEntryService(({ householdId }) => run({ householdId,
+  return withEntryService(({ householdId, service }) => run({ householdId, service,
     analytics: createAnalyticsService(createPostgresAnalyticsRepository(getDatabase().db)) }));
 }

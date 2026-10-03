@@ -35,10 +35,12 @@ test("browse and detail preserve value states, lifecycle and correction navigati
   await page.getByText("Filter by classification and ownership", { exact: true }).click();
   await page.getByLabel("Owner", { exact: true }).selectOption(choices.owners[0].id);
   await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page).toHaveURL(new RegExp("owner=" + choices.owners[0].id));
   await expect(row(funded)).toBeVisible();
   await page.getByLabel("Reporting date").focus();
   expect(await page.getByLabel("Reporting date").evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
-  expect((await page.getByRole("button", { name: "Apply filters" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect.poll(async () => (await page.getByRole("button", { name: "Apply filters" }).boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("investments.png"), fullPage: true });
   await page.goto("/investments/" + funded + "?date=2026-02-01&start=2024-01-01");
@@ -82,4 +84,108 @@ test("browse and detail preserve value states, lifecycle and correction navigati
   await expect(page.getByRole("link", { name: "Manage investment" })).toBeVisible();
   await page.getByRole("link", { name: "Open action and valuation history" }).click();
   await expect(page.getByLabel("Investment", { exact: true })).toHaveValue(funded);
+});
+
+test("canonical browse filters compose and survive URL navigation and reset", async ({ page }, testInfo) => {
+  await signIn(page);
+  const headers = { origin: new URL(page.url()).origin };
+  const { choices } = await (await page.request.get("/api/investments")).json();
+  const metadata = { ownerIds: [choices.owners[0].id], groupIds: [choices.customGroups[0].id],
+    assetClassId: choices.assetClasses[0].id, institutionId: choices.institutions[0].id,
+    accountTypeId: choices.accountTypes[0].id, taxStatusId: choices.taxStatuses[0].id, liquidityId: choices.liquidities[0].id };
+  async function create(suffix: string, classification: Record<string, unknown>) {
+    const response = await page.request.post("/api/investments", { headers, data: {
+      operation: "create", name: "Synthetic filter " + testInfo.project.name + " " + suffix, ...classification,
+    } });
+    expect(response.status()).toBe(200);
+    return (await response.json()).id as string;
+  }
+  const active = await create("active", metadata);
+  const closed = await create("closed", metadata);
+  const other = await create("other", { ...metadata, accountTypeId: choices.accountTypes[1].id,
+    taxStatusId: choices.taxStatuses[1].id, liquidityId: choices.liquidities[1].id });
+  const unclassified = await create("unclassified", { ownerIds: metadata.ownerIds, groupIds: [] });
+  expect((await page.request.post("/api/investments", { headers, data: {
+    operation: "close", investmentId: closed, closedOn: "2026-01-01", confirmed: true,
+  } })).status()).toBe(200);
+  const row = (id: string) => page.locator(".investment-row").filter({ has: page.locator('a[href^="/investments/' + id + '?"]') });
+  const dimensions = [
+    ["accountType", "Account type", metadata.accountTypeId],
+    ["taxStatus", "Tax status", metadata.taxStatusId],
+    ["liquidity", "Liquidity", metadata.liquidityId],
+  ] as const;
+  for (const [key, label, id] of dimensions) {
+    await page.goto("/investments?date=2026-02-01");
+    await expect(row(unclassified)).toBeVisible();
+    await page.getByText("Filter by classification and ownership", { exact: true }).click();
+    await page.getByLabel(label, { exact: true }).selectOption(id);
+    await page.getByLabel("Owner", { exact: true }).selectOption(metadata.ownerIds[0]);
+    await page.getByRole("button", { name: "Apply filters" }).click();
+    await expect(row(active)).toBeVisible();
+    await expect(row(other)).toHaveCount(0);
+    await expect(row(unclassified)).toHaveCount(0);
+    await expect(row(closed)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(key + "=" + id));
+    await page.getByLabel("Investments to show").selectOption("closed");
+    await page.getByRole("button", { name: "Apply filters" }).click();
+    await expect(row(closed)).toBeVisible();
+    await expect(row(active)).toHaveCount(0);
+    await expect(page.getByLabel(label, { exact: true })).toHaveValue(id);
+  }
+  await page.goto("/investments?date=2026-02-01");
+  await page.getByText("Filter by classification and ownership", { exact: true }).click();
+  for (const [, label, id] of dimensions) await page.getByLabel(label, { exact: true }).selectOption(id);
+  for (const [label, id] of [["Asset class", metadata.assetClassId], ["Institution", metadata.institutionId], ["Owner", metadata.ownerIds[0]], ["Custom group", metadata.groupIds[0]]]) {
+    await page.getByLabel(label, { exact: true }).selectOption(id);
+  }
+  await page.getByLabel("Investments to show").selectOption("all");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(row(active)).toBeVisible();
+  await expect(row(closed)).toBeVisible();
+  await expect(row(other)).toHaveCount(0);
+  await expect(row(unclassified)).toHaveCount(0);
+  await expect(page).toHaveURL(/lifecycle=all/);
+  const filteredUrl = page.url();
+  await page.getByLabel("Reporting date").fill("2026-03-01");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByLabel("Reporting date")).toHaveValue("2026-03-01");
+  await expect(page).toHaveURL(/date=2026-03-01/);
+  const updatedUrl = page.url();
+  const params = new URL(updatedUrl).searchParams;
+  for (const [key, , id] of dimensions) expect(params.get(key)).toBe(id);
+  expect(params.get("assetClass")).toBe(metadata.assetClassId);
+  expect(params.get("institution")).toBe(metadata.institutionId);
+  expect(params.get("owner")).toBe(metadata.ownerIds[0]);
+  expect(params.get("group")).toBe(metadata.groupIds[0]);
+  await page.reload();
+  for (const [, label, id] of dimensions) await expect(page.getByLabel(label, { exact: true })).toHaveValue(id);
+  await expect(row(active)).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(filteredUrl);
+  await expect(page.getByLabel("Reporting date")).toHaveValue("2026-02-01");
+  await expect(page.getByLabel("Account type")).toHaveValue(metadata.accountTypeId);
+  await page.goForward();
+  await expect(page).toHaveURL(updatedUrl);
+  await expect(page.getByLabel("Reporting date")).toHaveValue("2026-03-01");
+  await page.getByRole("link", { name: "Reset filters" }).click();
+  await expect(page.getByLabel("Reporting date")).toHaveValue("2026-03-01");
+  await expect(page.getByLabel("Investments to show")).toHaveValue("all");
+  await expect(row(unclassified)).toBeVisible();
+  await expect(row(other)).toBeVisible();
+  await page.getByText("Filter by classification and ownership", { exact: true }).click();
+  for (const label of ["Asset class", "Account type", "Tax status", "Liquidity", "Institution", "Owner", "Custom group"]) {
+    await expect(page.getByLabel(label, { exact: true })).toHaveValue("");
+  }
+  expect([...new URL(page.url()).searchParams.keys()].sort()).toEqual(["date", "lifecycle"]);
+  await page.goBack();
+  await expect(page).toHaveURL(updatedUrl);
+  for (const [, label, id] of dimensions) await expect(page.getByLabel(label, { exact: true })).toHaveValue(id);
+  await expect(row(unclassified)).toHaveCount(0);
+  await page.goForward();
+  await expect(row(unclassified)).toBeVisible();
+  await page.getByText("Filter by classification and ownership", { exact: true }).click();
+  for (const [, label] of dimensions) await expect(page.getByLabel(label, { exact: true })).toHaveValue("");
+  await page.goto("/investments?date=2026-03-01&accountType=unknown-id");
+  await expect(page.getByText("No investments match these filters")).toBeVisible();
+  await expect(page.getByLabel("Account type")).toHaveValue("unknown-id");
 });
