@@ -74,3 +74,9 @@ it("validates the component of historical expectations without changing the meas
   dataset.expectations[0].measure = "nav";
   expect(validate(dataset)).toContainEqual({code:"invalid_expectation",severity:"error",sourceKey:"nav-check",field:"historicalComponent"});
 });
+
+it("rejects a historical range instead of silently comparing its end point", () => {
+  const dataset = migrationFixture();
+  dataset.expectations[0] = {...dataset.expectations[0],measure:"historicalValue",timing:{startDate:"2023-01-01",endDate:"2024-02-29"},expected:{status:"available",value:"-10.00"}};
+  expect(validate(dataset)).toContainEqual({code:"invalid_expectation",severity:"error",sourceKey:"nav-check",field:"timing"});
+});

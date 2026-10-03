@@ -1,4 +1,5 @@
 import { assertCalendarDate, formatCents, netValue, parseCents, parseSignedCents } from "@/domain/financial";
+import { normalizeInvestmentName } from "@/domain/investment";
 import { WorkflowError } from "./errors";
 import type { CreateInvestment, EditInvestment, EditExternalAction, EditTransfer, EditValuationMark, PortfolioRepository, RecordExternalAction, RecordTransfer, ReplaceValuationMark, SaveValuationBatch, WriteValuationMark } from "./ports";
 
@@ -13,8 +14,8 @@ const positiveAmount = (value: string) => amount(value);
 const nonnegativeAmount = (value: string) => amount(value, true);
 
 function investmentMetadata<T extends CreateInvestment>(input: T): T {
-  const name = input.name.trim();
-  if (!name || name.length > 200) throw new WorkflowError("invalid_name", "name");
+  let name: string;
+  try { name = normalizeInvestmentName(input.name); } catch { throw new WorkflowError("invalid_name", "name"); }
   const ownerIds = [...new Set(input.ownerIds)];
   if (ownerIds.length === 0) throw new WorkflowError("owners_required", "ownerIds");
   return { ...input, name, ownerIds,

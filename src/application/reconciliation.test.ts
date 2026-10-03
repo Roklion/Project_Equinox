@@ -93,3 +93,9 @@ it("rejects a mismatched manifest and ambiguous annotations", async () => {
   const rule = {sourceDefinitionTag:"synthetic",measure:"pnl" as const,code:"different"};
   await expect(service(sources()).reconcile(dataset([]),manifest,[rule,rule])).rejects.toThrow("ambiguous");
 });
+
+it("rejects historical ranges even when their end-point value would match", async () => {
+  const history = expectation("history-range","historicalValue","85");
+  history.timing = {startDate:"2025-01-01",endDate:"2026-01-01"};
+  await expect(service(sources()).reconcile(dataset([history]),manifest)).rejects.toThrow("single as-of date");
+});

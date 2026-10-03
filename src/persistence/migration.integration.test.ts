@@ -116,3 +116,18 @@ it("resolves only explicit investment mappings for opaque source keys", async ()
   expect(await counts()).toEqual([3,6,7,6,4,1,1,1]);
   await expect(service().apply(input)).rejects.toThrow("preflight failed");
 });
+
+it("normalizes imported display names and rejects excessive names before any writes", async () => {
+  const record = input.dataset.records.find(r => r.kind === "investment")!;
+  if (record.kind !== "investment") throw new Error();
+  record.name = "x".repeat(201);
+  const before = await counts();
+  expect((await service().preflight(input)).findings).toContainEqual({code:"invalid_identity",severity:"error",sourceKey:record.sourceKey,field:"name"});
+  await expect(service().apply(input)).rejects.toMatchObject({code:"preflight_failed"});
+  expect(await counts()).toEqual(before);
+  record.name = "  Synthetic trimmed name  ";
+  const manifest = await service().apply(input);
+  const [saved] = await connection!.db.select().from(investments).where(eq(investments.id,manifest.ids[record.sourceKey]));
+  expect(saved.name).toBe("Synthetic trimmed name");
+  expect(record.name).toBe("  Synthetic trimmed name  ");
+});

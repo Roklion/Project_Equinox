@@ -23,3 +23,10 @@ export type Classification = { id: ClassificationId; householdId: HouseholdId; l
 export function canRecordInvestmentActivity(status: InvestmentStatus): boolean {
   return status === "active";
 }
+
+/** Canonical display names use the same boundary for ordinary entry and migration. */
+export function normalizeInvestmentName(value: string): string {
+  const name = value.trim();
+  if (!name || name.length > 200) throw new Error("Invalid investment name.");
+  return name;
+}
