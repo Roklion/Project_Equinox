@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { createMigrationService, MigrationError } from "@/application/migration";
-import type { MigrationRepository } from "@/application/migration-ports";
+import type { ImportFinding, MigrationRepository } from "@/application/migration-ports";
 import { createReconciliationService } from "@/application/reconciliation";
 import type { AnalyticsRepository } from "@/application/analytics-ports";
 import { validateMigration } from "@/domain/migration/validate";
@@ -50,6 +50,7 @@ export async function runMigrationCli(args: string[], config: {
   let connection: CliConnection | undefined;
   let report: Awaited<ReturnType<typeof reservePrivateReport>> | undefined;
   let committed = false;
+  let applyUncertain = false;
   let saved = false;
   try {
     const { command, options } = argumentsFor(args);
@@ -73,12 +74,15 @@ export async function runMigrationCli(args: string[], config: {
     const rules = options.annotations ? readRules(await json(options.annotations)) : [];
     if (manifest && (manifest.householdId !== mapping.householdId || manifest.datasetId !== input.dataset.datasetId
       || Object.keys(manifest.ids).length !== input.dataset.records.length || input.dataset.records.some(r => !Object.hasOwn(manifest.ids, r.sourceKey)))) throw new Error();
+    const investmentIds = input.dataset.records.filter(r => r.kind === "investment").map(r => manifest?.ids[r.sourceKey]);
+    if (manifest && new Set(investmentIds).size !== investmentIds.length) throw new Error();
     connection = (config.connect ?? connect)(databaseUrl(config.env ?? process.env));
     if (command === "reconcile") {
       // Existing history is expected here; use domain validation, not import collision policy.
       const catalog = await connection.migration.catalog(mapping.householdId);
-      const errors = validateMigration(input.dataset, mapping, catalog);
-      if (!catalog.exists || errors.length) { findings(errors); throw new Error(); }
+      const errors: ImportFinding[] = validateMigration(input.dataset, mapping, catalog);
+      if (!catalog.exists) errors.push({ code: "target_missing", severity: "error" });
+      if (errors.length) throw new MigrationError("preflight_failed", errors);
       const results = await createReconciliationService(connection.analytics).reconcile(input.dataset, manifest!, rules);
       await report.save({ datasetId: manifest!.datasetId, householdId: manifest!.householdId, results }); saved = true;
       const differences = results.filter(r => r.status !== "match").length;
@@ -98,14 +102,15 @@ export async function runMigrationCli(args: string[], config: {
     return 0;
   } catch (error) {
     if (error instanceof MigrationError) {
+      applyUncertain = error.code === "write_failed";
       for (const f of error.findings) log(JSON.stringify({ code: f.code, ...(f.sourceKey === undefined ? {} : { sourceKey: f.sourceKey }) }));
     }
-    log(committed ? "apply_committed_report_failed: Database apply committed but manifest output failed. Do not apply again; recover IDs using the stable dataset/source identities and inspect the target." : `migration_command_failed: Check arguments, private JSON inputs, explicit target configuration and output permissions. ${usage}`);
+    log(applyUncertain ? "apply_outcome_unknown: The transaction response failed; records may have committed. Do not apply again before inspecting the target and recovering the manifest or restoring the backup." : error instanceof MigrationError && error.code === "preflight_failed" ? "migration_preflight_failed: Correct the reported target or mapping findings before retrying." : committed ? "apply_committed_report_failed: Database apply committed but manifest output failed. Do not apply again; recover IDs using the stable dataset/source identities and inspect the target." : `migration_command_failed: Check arguments, private JSON inputs, explicit target configuration and output permissions. ${usage}`);
     return 1;
   } finally {
     // Cleanup failures must never expose a private path or override a sanitized result.
-    if (report && !saved && !committed) await report.discard().catch(() => log("report_cleanup_failed: Remove the incomplete private report manually."));
-    if (report && !saved && committed) await report.close().catch(() => log("report_close_failed"));
+    if (report && !saved && !committed && !applyUncertain) await report.discard().catch(() => log("report_cleanup_failed: Remove the incomplete private report manually."));
+    if (report && !saved && (committed || applyUncertain)) await report.close().catch(() => log("report_close_failed"));
     if (connection) await connection.close().catch(() => log("database_close_failed"));
   }
 }

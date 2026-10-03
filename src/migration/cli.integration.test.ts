@@ -69,6 +69,13 @@ it("CLI runs dry preflight, atomic apply, manifest-based reconciliation and repe
   differentArgs[differentArgs.indexOf("--manifest") + 1] = join(dir, "wrong-manifest.json");
   differentArgs[differentArgs.indexOf("--output") + 1] = join(dir, "wrong-report.json");
   expect(await runMigrationCli(differentArgs, config)).toBe(1);
+  // Separate scopes must not hide duplicate investment identities in a recovered manifest.
+  const duplicateManifest = { ...manifest, ids: { ...manifest.ids, "i-b": manifest.ids["i-a"] } };
+  await writeFile(join(dir, "duplicate-manifest.json"), JSON.stringify(duplicateManifest));
+  differentArgs[differentArgs.indexOf("--manifest") + 1] = join(dir, "duplicate-manifest.json");
+  differentArgs[differentArgs.indexOf("--output") + 1] = join(dir, "duplicate-report.json");
+  expect(await runMigrationCli(differentArgs, config)).toBe(1);
+  await expect(readFile(join(dir, "duplicate-report.json"))).rejects.toMatchObject({ code: "ENOENT" });
   await rm(join(dir, "apply.json"));
   expect(await runMigrationCli(args("apply"), config)).toBe(1);
   expect(await db!.db.select().from(investments)).toHaveLength(3); expect(await db!.db.select().from(movements)).toHaveLength(7);
