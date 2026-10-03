@@ -1,13 +1,13 @@
 # Installable app validation
 
-Equinox's EPIC 1 installed experience is online-only. The app manifest and icons support home-screen installation; there is no service worker, background sync, or offline portfolio storage. Financial pages will require a live session and connection when they are introduced. See [architecture](architecture.md) for the cache boundary and [design system](design-system.md) for responsive behavior.
+Equinox's installed experience is online-only. The app manifest and icons support home-screen installation; there is no service worker, background sync, or offline portfolio storage. Financial pages require a live session and connection. See [architecture](architecture.md#pwa-and-responsive-delivery) for the cache boundary and [design system](design-system.md#responsive-behavior) for responsive behavior.
 
 ## Local desktop checks
 
 1. Run `npm ci`, then `npm run dev`, and open `http://localhost:3000` in a Chromium browser. `localhost` is a secure context for local browser testing.
 2. In browser developer tools, inspect the Application > Manifest panel. Confirm the Equinox name, 192px and 512px icons, `/` start URL, and standalone display mode. Confirm `/manifest.webmanifest`, `/icon-192.png`, and `/icon-512.png` load successfully.
 3. Install Equinox through the browser's install action where offered. Open the installed window while online, reload the overview, and use the Equinox header link to return to `/`. The shell should fill the app window without browser page chrome.
-4. In responsive device mode, check a 390px wide iPhone viewport and a 1280px desktop viewport. The heading, empty state, header link, and footer should remain readable, reachable, and free of horizontal scrolling.
+4. In responsive device mode, check a 390px wide iPhone viewport and a 1280px desktop viewport. Navigation, financial summaries, forms and empty states should remain readable, reachable and free of horizontal scrolling.
 5. In Application > Service Workers and Storage, confirm this app registered no service worker and created no offline financial-data cache. Disconnect the network and confirm the app does not claim that portfolio information remains available offline.
 
 ## iPhone home-screen checks

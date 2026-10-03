@@ -1,6 +1,6 @@
 # Product regression validation
 
-EPIC 4's final integration pass protects the personal household product on Desktop Chrome and iPhone 13 dimensions/touch emulation in Chromium. These tests use invented names and values in disposable databases. They assert behavior, accessible text, dates and usable controls rather than pixel positions.
+Automated regression protects the personal household product on Desktop Chrome and iPhone 13 dimensions/touch emulation in Chromium. These tests use invented names and values in disposable databases. They assert behavior, accessible text, dates and usable controls rather than pixel positions.
 
 ## Automated journeys
 
@@ -17,18 +17,22 @@ EPIC 4's final integration pass protects the personal household product on Deskt
 | Real persisted chart values, dates, additive owner grouping and browser-local reporting dates | e2e/historical-charts.spec.ts |
 | Pointer selection, horizontal touch scrubbing, vertical page scrolling, keyboard date inspection, coverage gaps, negative segment rendering and color-independent labels | e2e/presentation/charts.spec.ts |
 | All seven browse filter controls at desktop/iPhone widths, landmarks, visible keyboard focus, touch targets, retained as-of dates, negative values, unavailable and presentation-only ambiguous return explanations | e2e/presentation/primitives.spec.ts |
-| Detailed EPIC 2 entry/correction, transfer and atomic batch workflows | e2e/desktop.spec.ts, e2e/iphone.spec.ts |
+| Detailed entry/correction, transfer and atomic batch workflows | e2e/desktop.spec.ts, e2e/iphone.spec.ts |
 
-The product journey distinguishes the four financial Add actions from investment creation/management. Its negative-NAV investment retains an unavailable XIRR explanation, and its retained history distinguishes valuation observations from cash movements. Existing Overview and historical-chart tests protect incomplete aggregate coverage and exact available constituents; missing coverage never becomes a zero aggregate. Grouping choices exclude overlapping custom groups. EPIC 3 continues to own numerical/formula regressions. The current fixed-guess XIRR policy does not emit ambiguity; only the presentation contract is exercised with an ambiguous synthetic result.
+The product journey distinguishes the four financial Add actions from investment creation/management. Its negative-NAV investment retains an unavailable XIRR explanation, and its retained history distinguishes valuation observations from cash movements. Existing Overview and historical-chart tests protect incomplete aggregate coverage and exact available constituents; missing coverage never becomes a zero aggregate. Grouping choices exclude overlapping custom groups. Domain and application tests own numerical/formula regressions. The current fixed-guess XIRR policy does not emit ambiguity; only the presentation contract is exercised with an ambiguous synthetic result.
+
+## Analytics regressions
+
+`src/domain/analytics/testing/canonical-fixture.ts` supplies the compact synthetic ledger. Domain and application regression tests assert independent expected values and cross-metric identities; `src/persistence/database.integration.test.ts` checks the same contracts through real canonical reads. Coverage includes transfer boundaries, joint ownership and overlapping groups, exact-cent aggregation, closed/partial realization, negative NAV, carried-forward and missing marks, combined-flow MOIC/XIRR, fixed-guess root selection and correction-driven recalculation. [Metrics](metrics.md) owns the definitions; the fixture and tests own the worked values.
 
 ## Commands and CI
 
 Run npm run check, npm run test:db, npm run test:presentation, npm run test:e2e and git diff --check against the intended base. The existing CI browser job runs the same presentation and E2E commands; test:e2e includes test:bootstrap after the seeded regression suite. test:bootstrap starts and cleans up a separate migration-only database per viewport; it never seeds it or resets an existing application database.
 
-Inspect generated synthetic screenshots and traces when a failure concerns layout or interaction. The primary workflows must fit the viewport, keep dates visible, offer labeled controls with usable focus/touch targets, and expose essential chart information outside the plot. Composition retains a signed cumulative stack: negative bands use diagonal hatching and subtract from adjacent areas, while a dashed authoritative total-NAV line distinguishes the net total from overlapping bands.
+Inspect generated synthetic screenshots and traces when a failure concerns layout or interaction. The primary workflows must fit the viewport, keep dates visible, offer labeled controls with usable focus/touch targets, and expose essential chart information outside the plot. [The historical chart contract](design-system.md#historical-chart-rendering-contract) owns signed-stack rendering and accessibility.
 
 ## Proportionate UX checks
 
 The integrated journey exercises updates without a full browser reload using the existing maintenance continuity assertions. Historical charts load one authoritative historical-series bundle per scope; local measure, range, date and grouping changes consume that bundle in React rather than issuing analytics requests. No speculative cache or background analytics infrastructure is introduced. Browser checks protect viewport fit, usable targets and scrolling; they are not performance benchmarks.
 
-Physical iPhone Safari and installed-PWA behavior remain device checks in pwa-validation.md. Chromium touch emulation is automated regression evidence, not physical-device verification.
+Physical iPhone Safari and installed-PWA behavior remain [device checks](pwa-validation.md). Chromium touch emulation is automated regression evidence, not physical-device verification.
