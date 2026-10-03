@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { entryLaunchContext } from "@/components/entry/launch-context";
 import { cookies } from "next/headers";
 import { loadHistoricalCharts } from "@/app/chart-data";
 import { notFound } from "next/navigation";
@@ -36,6 +37,7 @@ export default async function InvestmentDetailPage({ params, searchParams }: {
   const nav = valuation.status === "available" ? { status: "available" as const, value: valuation.value.navCents } : valuation;
   const delta = period.change.status === "available" ? { status: "available" as const, value: period.change.value.navChangeCents } : period.change;
   const charts = await loadHistoricalCharts({ investmentIds: [investment.id] }, query.date ? date : undefined);
+  const launch = entryLaunchContext({ investmentId: investment.id, date, start: period.startDate, from: "investment" });
   const historyHref = "/investments/history?investmentId=" + encodeURIComponent(investment.id);
   return <><div className="entry-topline"><Link href={"/investments?date=" + date + (investment.status === "closed" ? "&lifecycle=all" : "")}>← Investments</Link></div>
     <section className="page-heading"><p className="eyebrow">Investment detail</p><h1>{investment.name}</h1>
@@ -43,7 +45,7 @@ export default async function InvestmentDetailPage({ params, searchParams }: {
       <HeadlineValue label="Net investment value" result={nav} asOfDate={date} delta={delta} context={"since " + formatDate(period.startDate)} />
       {valuation.status === "available" && <ValuationAge markAsOfDate={valuation.value.markAsOfDate} ageDays={valuation.value.ageDays} />}
       <div className="entry-actions">{investment.status === "active"
-        ? <Link className="primary-button" href="/add">Add financial action</Link>
+        ? <Link className="primary-button" href={launch.launcherHref}>Add financial action</Link>
         : <p className="metric-context">This investment is closed. Historical corrections remain available.</p>}
         <Link href={"/investments/" + investment.id + "/manage"}>Manage investment</Link></div></section>
     <form className="investment-filters entry-form" action={"/investments/" + investment.id}>

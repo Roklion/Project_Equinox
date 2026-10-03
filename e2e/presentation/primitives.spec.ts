@@ -19,6 +19,11 @@ test("keyboard navigation has visible focus, usable targets, and all destination
     expect(box!.width).toBeGreaterThanOrEqual(44);
   }
   await page.keyboard.press("Tab");
+  const settings = page.getByRole("link", { name: "Settings", exact: true });
+  await expect(settings).toBeFocused();
+  expect(await settings.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
+  expect((await settings.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
   await expect(page.locator('[aria-current="page"]')).toHaveText("Investments");
 });

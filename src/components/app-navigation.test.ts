@@ -8,13 +8,13 @@ const route = vi.hoisted(() => ({ pathname: "/" }));
 vi.mock("next/navigation", () => ({ usePathname: () => route.pathname }));
 
 describe("application navigation", () => {
-  it.each(["/", "/investments", "/investments/example", "/updates", "/valuations/batch", "/add/transfer"])(
+  it.each(["/", "/investments", "/investments/example", "/updates", "/valuations/batch", "/add/transfer", "/settings"])(
     "offers the same concepts and one current destination on %s", (pathname) => {
       const html = renderToStaticMarkup(h(NavigationLinks, { pathname }));
-      for (const route of ["/", "/investments", "/updates", "/add"]) expect(html).toContain(`href="${route}"`);
+      for (const route of ["/", "/investments", "/updates", "/add", "/settings"]) expect(html).toContain(`href="${route}"`);
       expect(html.match(/aria-current="page"/g)).toHaveLength(1);
       const activeHref = pathname.startsWith("/investments") ? "/investments"
-        : pathname.startsWith("/add") ? "/add" : pathname === "/" ? "/" : "/updates";
+        : pathname.startsWith("/add") ? "/add" : pathname === "/settings" ? "/settings" : pathname === "/" ? "/" : "/updates";
       const currentLink = html.match(/<a[^>]*aria-current="page"[^>]*>/)?.[0];
       expect(currentLink).toContain(`href="${activeHref}"`);
       expect(html).toContain('aria-label="Primary"');

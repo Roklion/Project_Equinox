@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { settingsWorkflow } from "./settings-workflow";
 
 test("clean migrations -> authenticated household setup -> first unclassified investment", async ({ page }, info) => {
   await page.goto("/investments/new");
@@ -67,6 +68,7 @@ test("clean migrations -> authenticated household setup -> first unclassified in
   await expect(page.getByText(/Valuation coverage is incomplete/).first()).toBeVisible();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Investments", exact: true }).click();
   await expect(page.getByRole("link", { name: "First sample investment", exact: true })).toBeVisible();
+  await settingsWorkflow(page, info);
   await page.goto("/setup");
   await expect(page.getByRole("heading", { level: 1, name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create household" })).toHaveCount(0);

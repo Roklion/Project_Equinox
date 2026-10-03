@@ -25,6 +25,8 @@ EPIC 5 now has source-neutral migration contracts and a private, versioned canon
 
 ## Local setup
 
+After household setup, **Settings** maintains household/owner names and the six classification/custom-group dimensions without demo seeding or SQL. Investment forms link to the relevant settings section. See [runtime administration](docs/product-spec.md#runtime-administration) for behavior and [canonical identity/removal rules](docs/data-model.md#runtime-administration).
+
 Install Node.js 24.x (see `.nvmrc`) and npm 11.x. From a clean checkout:
 
 ```sh

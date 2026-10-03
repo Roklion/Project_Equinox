@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { entryLaunchContext } from "@/components/entry/launch-context";
+import type { PageQuery } from "@/components/financial/reporting-context";
 
 const actions = [
   { href: "/add/contribution", label: "Contribution", description: "Add money to an investment." },
@@ -7,10 +9,11 @@ const actions = [
   { href: "/add/valuation", label: "Valuation Mark", description: "Update an investment's value as of a date." },
 ] as const;
 
-export default function AddPage() {
+export default async function AddPage({ searchParams }: { searchParams?: Promise<PageQuery> }) {
+  const context = entryLaunchContext(await searchParams ?? {});
   return (
     <>
-      <div className="entry-topline"><Link href="/">← Overview</Link></div>
+      <div className="entry-topline"><Link href={context.returnHref ?? "/"}>{context.returnHref ? "← Investment detail" : "← Overview"}</Link></div>
       <section className="page-heading">
         <p className="eyebrow">Add an entry</p>
         <h1>What would you like to record?</h1>
@@ -18,7 +21,7 @@ export default function AddPage() {
       </section>
       <nav className="action-grid" aria-label="Choose an action">
         {actions.map((action) => (
-          <Link className="action-choice" href={action.href} key={action.href}>
+          <Link className="action-choice" href={action.href + context.suffix} key={action.href}>
             <strong>{action.label}</strong><span>{action.description}</span><span aria-hidden="true">→</span>
           </Link>
         ))}

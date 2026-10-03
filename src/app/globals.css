@@ -124,6 +124,8 @@ h2 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-block: var(--space-2); }
 
 /* One navigation model; composition changes without duplicating controls. */
 .shell-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding-block: var(--space-2); border-bottom: 1px solid var(--color-border); }
+.shell-secondary { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.shell-secondary > a { display: flex; align-items: center; min-height: 48px; font-size: 0.875rem; }
 .primary-navigation { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .primary-navigation a { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0.65rem 1rem; border-radius: var(--radius-small); text-decoration: none; font-weight: 700; }
 .primary-navigation a[aria-current="page"] { background: var(--color-accent-soft); text-decoration: underline; text-underline-offset: 0.3em; }

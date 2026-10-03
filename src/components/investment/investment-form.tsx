@@ -24,6 +24,7 @@ export function InvestmentForm({ investmentId }: { investmentId?: string }) {
   const [closedOn, setClosedOn] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const settingsReturn = encodeURIComponent(investmentId ? `/investments/${investmentId}/manage` : "/investments/new");
 
   useEffect(() => {
     let cancelled = false;
@@ -76,9 +77,11 @@ export function InvestmentForm({ investmentId }: { investmentId?: string }) {
           <input id="investment-name" maxLength={200} value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} {...accessibility("name")} />{error("name")}</div>
         <fieldset className="investment-options" {...accessibility("ownerIds")}><legend>Owners</legend>
           <p className="field-help">Choose one or more owners. Joint ownership does not assign percentages.</p>
+          <Link href={`/settings?returnTo=${settingsReturn}`} prefetch={false}>Manage owners</Link>
           {choices.owners.length === 0 && <p>Add owner records to the household before creating an investment.</p>}
           {choices.owners.map((choice) => <label key={choice.id}><input type="checkbox" checked={values.ownerIds.includes(choice.id)} onChange={() => toggle("ownerIds", choice.id)} />{choice.label}</label>)}{error("ownerIds")}
         </fieldset>
+        <Link href={`/settings?section=classifications&returnTo=${settingsReturn}`} prefetch={false}>Manage classifications and custom groups</Link>
         <div className="investment-classifications">{dimensions.map(([field, label, lookup]) => <div className="entry-field" key={field}>
           <label htmlFor={field}>{label}</label><select id={field} value={values[field] ?? ""} {...accessibility(field)} onChange={(event) => setValues({ ...values, [field]: event.target.value || null })}>
             <option value="">Not classified</option>{choices[lookup].map((choice) => <option key={choice.id} value={choice.id}>{choice.label}</option>)}

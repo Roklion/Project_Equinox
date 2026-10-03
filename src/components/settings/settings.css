@@ -1,0 +1,10 @@
+.settings-panel { max-width: 45rem; }
+.settings-panel h2 { margin-block: 0 var(--space-2); }
+.settings-editor { padding-block: var(--space-2); }
+.settings-values .settings-editor { border-bottom: 1px solid var(--color-border); }
+.settings-editor .investment-fields { gap: var(--space-1); }
+.settings-editor .entry-actions { flex-wrap: wrap; }
+.settings-editor .correction-notice { overflow-wrap: anywhere; }
+.settings-navigation { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.settings-navigation a, .settings-return { display: inline-flex; align-items: center; min-height: 48px; }
+.settings-navigation a[aria-current="page"] { font-weight: 700; text-underline-offset: 0.3em; }
